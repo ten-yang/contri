@@ -72,7 +72,7 @@ button{cursor:pointer}
 /* app */
 .wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;display:grid;gap:20px;padding-top:20px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
-.title-row{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.title-row{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 320px}
 .eyebrow{display:flex;align-items:center;gap:8px}
 .eyebrow .brand-mark{width:22px;height:22px;border-radius:6px}
 .eyebrow .brand-mark::before,.eyebrow .brand-mark::after{width:10px;height:10px;top:6px;border-width:1.5px}
@@ -81,6 +81,7 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 #groupName:hover{border-color:var(--line)}
 #groupName:focus{border-color:var(--accent);outline:none}
 .head-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:600px){.head-actions{width:100%}.head-actions .btn{flex:1 1 auto}}
 .banner{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 14px;color:var(--muted);font-size:14px}
 
 .grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;grid-template-areas:"main top" "main bottom";gap:20px;align-items:start}
