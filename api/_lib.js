@@ -33,7 +33,11 @@ export function passcodeOk(given) {
 
 export const parseMap = m => {
   const out = {};
-  for (const [k, v] of Object.entries(m || {})) {
+  // Upstash returns HGETALL as a flat [field, value, field, value] array when auto-parsing is off.
+  const pairs = Array.isArray(m)
+    ? Array.from({ length: Math.floor(m.length / 2) }, (_, i) => [m[2 * i], m[2 * i + 1]])
+    : Object.entries(m || {});
+  for (const [k, v] of pairs) {
     try { out[k] = typeof v === "string" ? JSON.parse(v) : v; } catch { /* skip bad row */ }
   }
   return out;
