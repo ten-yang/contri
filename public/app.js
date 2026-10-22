@@ -172,7 +172,17 @@ function renderPeople(){
   }).join("");
   el.querySelectorAll("[data-rm]").forEach(x => x.onclick = () => removePerson(x.dataset.rm));
 }
+function setActOpen(open){
+  $("#actToggle").setAttribute("aria-expanded", open); $("#activity").hidden = !open;
+}
+$("#actToggle").onclick = () => {
+  const open = $("#actToggle").getAttribute("aria-expanded") !== "true";
+  setActOpen(open); lsSet("contri.actOpen", open ? "1" : "");
+};
+setActOpen(lsGet("contri.actOpen") === "1");
 function renderActivity(){
+  const n = state.log.length;
+  $("#actCount").textContent = n ? `${n >= 100 ? "100+" : n} change${n === 1 ? "" : "s"}` : "Every change";
   const el = $("#activity");
   if (!state.log.length){ el.innerHTML = `<li><span></span><span class="sub">Changes show up here as people add, edit and delete entries.</span></li>`; return; }
   el.innerHTML = state.log.slice(0, 20).map(a => {
