@@ -13,10 +13,10 @@ function lsSet(k, v){ try { v ? localStorage.setItem(k, v) : localStorage.remove
 
 /* ---------- API ---------- */
 class ApiError extends Error { constructor(status, msg){ super(msg); this.status = status; } }
-async function api(method, body, query = ""){
+async function api(method, body, query = "", path = "/api/data"){
   let res;
   try {
-    res = await fetch("/api/data" + query, { method, cache: "no-store",
+    res = await fetch(path + query, { method, cache: "no-store",
       headers: { "content-type": "application/json", "x-passcode": pass, "x-who": me || "" },
       body: body ? JSON.stringify(body) : undefined });
   } catch { throw new ApiError(0, "You're offline. Check your connection and try again."); }
@@ -229,6 +229,7 @@ function renderLedger(){
   }
   el.innerHTML = html;
   state.entries.forEach(e => seen.add(e.id + ":" + (e.editedAt || e.createdAt)));
+  el.querySelectorAll("[data-rx]").forEach(x => x.onclick = () => openViewer(state.entries.find(z => z.id === x.dataset.rx)));
   el.querySelectorAll("[data-edit]").forEach(x => x.onclick = () => {
     const e = state.entries.find(z => z.id === x.dataset.edit); if (!e) return;
     e.type === "payment" ? openPay(e) : openExpense(e);
@@ -251,7 +252,7 @@ function entryHtml(e){
     const to = Object.keys(e.split || {})[0];
     return `<div class="entry${fresh ? " fresh" : ""}">${dateCol}
       <div class="e-main"><div class="e-title"><span class="tag pay">Payment</span>${esc(pName(e.paidBy))} paid ${esc(pName(to))}</div>
-      ${e.note ? `<div class="e-line">${esc(e.note)}</div>` : ""}${prov}</div>
+      ${e.note ? `<div class="e-line">${esc(e.note)}</div>` : ""}${rxChip(e)}${prov}</div>
       <div class="e-right"><div class="num e-amt">${fmt(e.amount)}</div>${mine}${actions}</div></div>`;
   }
   const modeTxt = e.mode === "exact" ? "exact amounts" : e.mode === "percent" ? "by percentage" : "equally";
@@ -259,7 +260,7 @@ function entryHtml(e){
   return `<div class="entry${fresh ? " fresh" : ""}">${dateCol}
     <div class="e-main"><div class="e-title"><span class="tag">${esc(e.category || "Other")}</span>${esc(e.desc || "Untitled")}</div>
     <div class="e-line">${esc(pName(e.paidBy))} paid · split ${modeTxt}${e.note ? " · " + esc(e.note) : ""}</div>
-    <div class="splits">${splits}</div>${prov}</div>
+    <div class="splits">${splits}</div>${rxChip(e)}${prov}</div>
     <div class="e-right"><div class="num e-amt">${fmt(e.amount)}</div>${mine}${actions}</div></div>`;
 }
 
@@ -307,7 +308,9 @@ function openExpense(e){
   $("#fxDelete").hidden = !e; $("#fxDelete").textContent = "Delete"; $("#fxDelete").dataset.arm = "";
   $("#fxCur").textContent = curSymbol();
   $("#fxDesc").value = e?.desc || ""; $("#fxAmt").value = e ? (e.amount / 100).toFixed(2) : "";
-  $("#fxDate").value = e?.date || today(); $("#fxCat").value = e?.category || "Groceries"; $("#fxNote").value = e?.note || "";
+  $("#fxDate").value = e?.date || today(); $("#fxNote").value = e?.note || "";
+  fillCategories(e?.category || "Groceries");
+  rxItems = (e?.receipts || []).map(id => ({ id, existing: true })); renderRx();
   $("#fxPayer").innerHTML = peopleOpts();
   $("#fxPayer").value = e?.paidBy || (personById(me) ? me : state.people[0]?.id);
   buildParts(e); setMode(e?.mode || "equal");
@@ -370,12 +373,107 @@ $("#fExpense").addEventListener("submit", async ev => {
   if (!desc){ $("#fxErr").textContent = "Add a short description so everyone knows what this was."; $("#fxDesc").focus(); return; }
   if (!r.total){ $("#fxErr").textContent = "Enter an amount above zero."; $("#fxAmt").focus(); return; }
   if (!r.ok){ $("#fxErr").textContent = "The split doesn't match the total yet. " + r.msg + "."; return; }
+  const isNewCat = $("#fxCat").value === NEW_CAT;
+  const category = isNewCat ? $("#fxCatNew").value.trim().replace(/\s+/g, " ") : $("#fxCat").value;
+  if (!category){ $("#fxErr").textContent = "Type a name for the new category."; $("#fxCatNew").focus(); return; }
+  if (rxItems.some(x => x.busy)){ $("#fxErr").textContent = "Wait a moment, a photo is still being prepared."; return; }
+  $("#fxSave").disabled = true;
+  try { await uploadRx(); }
+  catch (e){ $("#fxSave").disabled = false; if (e.status === 401){ dx.close(); return handleErr(e); } $("#fxErr").textContent = e.message; return; }
+  $("#fxSave").disabled = false;
   const entry = { id: editing?.id || uid(), type: "expense", desc, amount: r.total, date: $("#fxDate").value || today(),
-    category: $("#fxCat").value, paidBy: $("#fxPayer").value, mode, split: r.split, note: $("#fxNote").value.trim() };
+    category, receipts: rxItems.map(x => x.id), paidBy: $("#fxPayer").value, mode, split: r.split, note: $("#fxNote").value.trim() };
   if (mode === "percent") entry.pct = r.pct;
   await save(entry, dx, $("#fxErr"));
 });
 $("#fxDelete").addEventListener("click", () => armDelete($("#fxDelete"), dx, $("#fxErr")));
+
+/* ---------- categories ---------- */
+const BUILT_IN = ["Groceries","Dining","Rent","Utilities","Travel","Transport","Shopping","Fun","Health","Other"];
+const NEW_CAT = "__new__";
+function fillCategories(current){
+  const used = state.entries.filter(e => e.type !== "payment" && e.category).map(e => e.category);
+  const custom = [...new Set(used.filter(c => !BUILT_IN.some(b => b.toLowerCase() === c.toLowerCase())))].sort((a, z) => a.localeCompare(z));
+  const all = [...BUILT_IN.filter(c => c !== "Other"), ...custom, "Other"];
+  if (current && !all.includes(current)) all.splice(all.length - 1, 0, current);
+  $("#fxCat").innerHTML = all.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("") + `<option value="${NEW_CAT}">+ New category…</option>`;
+  $("#fxCat").value = current || "Groceries";
+  $("#fxCatNew").value = ""; $("#fxCatNew").hidden = true;
+}
+$("#fxCat").addEventListener("change", () => {
+  const isNew = $("#fxCat").value === NEW_CAT;
+  $("#fxCatNew").hidden = !isNew; if (isNew) $("#fxCatNew").focus();
+});
+
+/* ---------- receipt photos ---------- */
+const MAX_RX = 4;
+let rxItems = [];            // {id, existing} or {id, dataUrl} or {id, busy}
+const rxCache = new Map();   // id -> data URL
+function rxChip(e){
+  const n = (e.receipts || []).length;
+  if (!n) return "";
+  return `<button type="button" class="rx-chip" data-rx="${esc(e.id)}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l8.6-8.6a3.7 3.7 0 015.2 5.2l-8.6 8.6a1.8 1.8 0 01-2.6-2.6l7.9-7.9"/></svg>${n === 1 ? "Receipt" : n + " photos"}</button>`;
+}
+async function getRx(id){
+  if (rxCache.has(id)) return rxCache.get(id);
+  const d = await api("GET", null, "?id=" + encodeURIComponent(id), "/api/receipt");
+  rxCache.set(id, d.data); return d.data;
+}
+function renderRx(){
+  const el = $("#fxRx");
+  el.innerHTML = rxItems.map((x, i) => `<div class="rx">${x.busy ? `<span class="busy">Preparing…</span>` : `<img alt="Photo ${i + 1}" data-i="${i}">`}<button type="button" data-rm="${i}" aria-label="Remove photo ${i + 1}">×</button></div>`).join("");
+  el.querySelectorAll("img[data-i]").forEach(img => {
+    const x = rxItems[+img.dataset.i];
+    if (x.dataUrl) img.src = x.dataUrl;
+    else getRx(x.id).then(u => { img.src = u; }).catch(() => { img.alt = "Couldn't load"; });
+  });
+  el.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { rxItems.splice(+b.dataset.rm, 1); renderRx(); });
+  $("#fxAddRx").hidden = rxItems.length >= MAX_RX;
+  $("#fxRxHint").textContent = rxItems.length >= MAX_RX ? "That's the maximum of 4 photos." : "Up to 4. Photos are shrunk before uploading.";
+}
+$("#fxAddRx").onclick = () => $("#fxFiles").click();
+$("#fxFiles").addEventListener("change", async ev => {
+  const files = [...ev.target.files].slice(0, MAX_RX - rxItems.length);
+  ev.target.value = "";
+  for (const f of files){
+    const item = { id: uid(), busy: true }; rxItems.push(item); renderRx();
+    try { item.dataUrl = await shrink(f); delete item.busy; }
+    catch { rxItems.splice(rxItems.indexOf(item), 1); toast("Couldn't read that photo. Try a JPEG or PNG."); }
+    renderRx();
+  }
+});
+async function shrink(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+    for (const [side, q] of [[1600, 0.72], [1200, 0.62], [900, 0.55]]){
+      const k = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      const out = c.toDataURL("image/jpeg", q);
+      if (out.length < 900_000) return out;
+    }
+    throw new Error("too big");
+  } finally { URL.revokeObjectURL(url); }
+}
+async function uploadRx(){
+  for (const x of rxItems){
+    if (!x.dataUrl || x.uploaded) continue;
+    await api("POST", { id: x.id, data: x.dataUrl }, "", "/api/receipt");
+    x.uploaded = true; rxCache.set(x.id, x.dataUrl);
+  }
+}
+const dv = $("#dlgView");
+async function openViewer(e){
+  if (!e) return;
+  const ids = e.receipts || [];
+  $("#vwTitle").textContent = `${e.desc || "Payment"} · ${ids.length === 1 ? "receipt" : ids.length + " photos"}`;
+  $("#vwList").innerHTML = ids.map((id, i) => `<img alt="Photo ${i + 1} for ${esc(e.desc || "this entry")}" data-id="${esc(id)}" width="800" height="600">`).join("");
+  dv.showModal();
+  $("#vwList").querySelectorAll("img").forEach(img => getRx(img.dataset.id).then(u => { img.src = u; img.removeAttribute("width"); img.removeAttribute("height"); })
+    .catch(err => { if (err.status === 401){ dv.close(); handleErr(err); } else img.replaceWith(Object.assign(document.createElement("p"), { className: "sub", textContent: err.message })); }));
+}
 
 /* ---------- payment dialog ---------- */
 const dp = $("#dlgPay");
@@ -442,7 +540,7 @@ function startPolling(){
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") poll(); });
 }
 async function poll(){
-  if (polling || document.visibilityState !== "visible" || !pass || dx.open || dp.open) return;
+  if (polling || document.visibilityState !== "visible" || !pass || dx.open || dp.open || dv.open) return;
   polling = true;
   try {
     if (await load(false)){

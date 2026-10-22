@@ -1,26 +1,13 @@
 // GET  /api/data?v=N  -> whole ledger, or {unchanged:true} if version N is current
 // POST /api/data      -> one change: {op, ...}
 // Every request needs the group passcode in the "x-passcode" header.
-import { store, K, passcodeOk, parseMap, cleanPerson, cleanEntry, cleanMeta, Bad } from "./_lib.js";
+import { gate, K, parseMap, cleanPerson, cleanEntry, cleanMeta, Bad } from "./_lib.js";
 
-const MAX_FAILS = 10;          // wrong passcodes allowed per IP...
-const LOCK_SECONDS = 15 * 60;  // ...within this window
 const LOG_KEEP = 300;
 
 export default async function handler(req, res) {
-  res.setHeader("Cache-Control", "no-store");
-  const db = store();
-  if (!db) return res.status(500).json({ error: "Storage isn't connected yet. Add an Upstash Redis store to this Vercel project, then redeploy." });
-  if (!process.env.GROUP_PASSCODE) return res.status(500).json({ error: "No group passcode is set. Add GROUP_PASSCODE in the Vercel project settings, then redeploy." });
-
-  const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
-  const fails = Number((await db.get(K.lock(ip))) || 0);
-  if (fails >= MAX_FAILS) return res.status(429).json({ error: "Too many wrong passcodes. Try again in 15 minutes." });
-  if (!passcodeOk(req.headers["x-passcode"])) {
-    await db.incr(K.lock(ip));
-    if (fails === 0) await db.expire(K.lock(ip), LOCK_SECONDS);
-    return res.status(401).json({ error: "That passcode isn't right." });
-  }
+  const db = await gate(req, res);
+  if (!db) return;
 
   try {
     if (req.method === "GET") return res.status(200).json(await read(db, req.query && req.query.v));
@@ -86,9 +73,15 @@ async function write(db, b, whoRaw) {
       const prevRaw = await db.hget(K.entries, e.id);
       let prev = null;
       try { prev = prevRaw ? JSON.parse(prevRaw) : null; } catch {}
+      // Photos are uploaded first with a 1-day expiry; keep the ones this entry uses, drop the ones it no longer uses.
+      for (const id of e.receipts || []) {
+        if (!(await db.exists(K.receipt(id)))) throw new Bad("A photo didn't finish uploading. Remove it and add it again.");
+        await db.persist(K.receipt(id));
+      }
       if (prev) Object.assign(e, { addedBy: prev.addedBy ?? null, createdAt: prev.createdAt || now, editedBy: who, editedAt: now });
       else Object.assign(e, { addedBy: who, createdAt: now });
       await db.hset(K.entries, { [e.id]: JSON.stringify(e) });
+      for (const id of (prev && prev.receipts) || []) if (!(e.receipts || []).includes(id)) await db.del(K.receipt(id));
       log = { action: prev ? "edited" : "added", type: e.type, desc: e.desc, amount: e.amount, from: e.paidBy, to: e.type === "payment" ? Object.keys(e.split)[0] : null,
               before: prev && prev.amount !== e.amount ? prev.amount : undefined };
       break;
@@ -98,6 +91,7 @@ async function write(db, b, whoRaw) {
       if (!raw) throw new Bad("That entry was already deleted.");
       let e = {}; try { e = JSON.parse(raw); } catch {}
       await db.hdel(K.entries, b.id);
+      for (const id of e.receipts || []) await db.del(K.receipt(id));
       log = { action: "deleted", type: e.type, desc: e.desc, amount: e.amount, from: e.paidBy, to: e.type === "payment" ? Object.keys(e.split || {})[0] : null };
       break;
     }

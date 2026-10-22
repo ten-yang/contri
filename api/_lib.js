@@ -16,9 +16,11 @@ export const K = {
   version: "ledger:version",
   log: "ledger:log",
   lock: ip => "ledger:fail:" + ip,
+  receipt: id => "ledger:receipt:" + id,
 };
 
 export const CATEGORIES = ["Groceries","Dining","Rent","Utilities","Travel","Transport","Shopping","Fun","Health","Other"];
+export const MAX_RECEIPTS = 4;
 export const CURRENCIES = ["USD","INR","EUR","GBP","CAD"];
 const ID = /^[a-z0-9]{6,32}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -79,13 +81,17 @@ export function cleanEntry(e, people) {
   } else {
     out.desc = str(e.desc, 80);
     need(out.desc.length > 0, "Add a short description.");
-    out.category = CATEGORIES.includes(e.category) ? e.category : "Other";
+    out.category = str(e.category, 24).replace(/\s+/g, " ") || "Other";
     out.mode = ["equal", "exact", "percent"].includes(e.mode) ? e.mode : "equal";
     if (out.mode === "percent" && e.pct && typeof e.pct === "object") {
       out.pct = {};
       for (const [id, p] of Object.entries(e.pct)) if (split[id] && Number.isFinite(p)) out.pct[id] = Math.round(p * 100) / 100;
     }
   }
+  const rx = Array.isArray(e.receipts) ? [...new Set(e.receipts)] : [];
+  need(rx.length <= MAX_RECEIPTS, `Attach up to ${MAX_RECEIPTS} photos.`);
+  need(rx.every(id => ID.test(id)), "Invalid photo id.");
+  if (rx.length) out.receipts = rx;
   return out;
 }
 
@@ -94,4 +100,24 @@ export function cleanMeta(m) {
     name: str(m && m.name, 60) || "Our Spending",
     currency: CURRENCIES.includes(m && m.currency) ? m.currency : "USD",
   };
+}
+
+// Passcode check with a per-IP lockout, shared by every endpoint.
+const MAX_FAILS = 10;          // wrong passcodes allowed per IP...
+const LOCK_SECONDS = 15 * 60;  // ...within this window
+export async function gate(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  const db = store();
+  if (!db) { res.status(500).json({ error: "Storage isn't connected yet. Add an Upstash Redis store to this Vercel project, then redeploy." }); return null; }
+  if (!process.env.GROUP_PASSCODE) { res.status(500).json({ error: "No group passcode is set. Add GROUP_PASSCODE in the Vercel project settings, then redeploy." }); return null; }
+  const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
+  const fails = Number((await db.get(K.lock(ip))) || 0);
+  if (fails >= MAX_FAILS) { res.status(429).json({ error: "Too many wrong passcodes. Try again in 15 minutes." }); return null; }
+  if (!passcodeOk(req.headers["x-passcode"])) {
+    await db.incr(K.lock(ip));
+    if (fails === 0) await db.expire(K.lock(ip), LOCK_SECONDS);
+    res.status(401).json({ error: "That passcode isn't right." });
+    return null;
+  }
+  return db;
 }

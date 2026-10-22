@@ -182,6 +182,18 @@ form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
 .check.bad{background:var(--neg-soft);color:var(--neg)}
 .sheet-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .err{color:var(--neg);font-size:13px;min-height:1em}
+.rx-row{display:flex;flex-wrap:wrap;gap:8px}
+.rx-row:empty{display:none}
+.rx{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;background:var(--sunk);border:1px solid var(--line)}
+.rx img{width:100%;height:100%;object-fit:cover;display:block}
+.rx button{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;border:0;background:rgb(0 0 0 / .6);color:#fff;font-size:14px;line-height:22px;padding:0}
+.rx .busy{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;color:var(--muted)}
+.rx-add{display:inline-flex;align-items:center;gap:8px;justify-self:start}
+.rx-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--solid);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;color:var(--accent);justify-self:start}
+.vw-list{display:grid;gap:12px}
+.vw-list img{width:100%;height:auto;border-radius:8px;border:1px solid var(--line);background:var(--sunk)}
+#dlgView .sheet{display:grid;gap:12px;padding:16px 20px 20px;overflow:auto}
+#fxCatNew{margin-top:6px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;z-index:20;max-width:calc(100vw - 32px);text-align:center}
 @media (prefers-reduced-motion:no-preference){.entry.fresh{animation:in .6s ease both}@keyframes in{from{background:var(--accent-soft)}to{background:transparent}}}
 </style>
@@ -289,7 +301,8 @@ form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
     <div class="row2">
       <div class="field"><label class="label" for="fxPayer">Paid by</label><select id="fxPayer"></select></div>
       <div class="field"><label class="label" for="fxCat">Category</label>
-        <select id="fxCat"><option>Groceries</option><option>Dining</option><option>Rent</option><option>Utilities</option><option>Travel</option><option>Transport</option><option>Shopping</option><option>Fun</option><option>Health</option><option>Other</option></select></div>
+        <select id="fxCat"></select>
+        <input type="text" id="fxCatNew" maxlength="24" placeholder="Name your category, e.g. Gas" aria-label="New category name" hidden></div>
     </div>
     <div class="field">
       <span class="label">Split</span>
@@ -301,7 +314,16 @@ form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
       <div class="parts" id="fxParts"></div>
       <div class="check" id="fxCheck"></div>
     </div>
-    <div class="field"><label class="label" for="fxNote">Note (optional)</label><input type="text" id="fxNote" maxlength="140" placeholder="Receipt in the shared album"></div>
+    <div class="field"><label class="label" for="fxNote">Note (optional)</label><input type="text" id="fxNote" maxlength="140" placeholder="Anything the group should know"></div>
+    <div class="field">
+      <span class="label">Photos (optional)</span>
+      <div class="rx-row" id="fxRx"></div>
+      <input type="file" id="fxFiles" accept="image/*" multiple hidden>
+      <button class="btn rx-add" type="button" id="fxAddRx">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>
+        Add receipt or photo</button>
+      <span class="sub" id="fxRxHint" style="font-size:12px">Up to 4. Photos are shrunk before uploading.</span>
+    </div>
     <div class="err" id="fxErr"></div>
     <div class="sheet-actions">
       <button class="btn danger" type="button" id="fxDelete" hidden>Delete</button>
@@ -334,6 +356,13 @@ form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
       <button class="btn primary" type="submit">Save payment</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="dlgView">
+  <div class="sheet">
+    <div class="panel-head"><h2 id="vwTitle">Receipts</h2><button class="btn ghost" type="button" data-close>Close</button></div>
+    <div class="vw-list" id="vwList"></div>
+  </div>
 </dialog>
 
 <script src="/app.js"></script>
