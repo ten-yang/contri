@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Contri</title>
+<meta name="description" content="Track shared spending and split it fairly, with every change visible to the group.">
+<meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f141a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Contri">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: ledger column beside "where we stand / settle up" (top) and "activity / people" (bottom); on phones: summary, ledger, then the rest. */
+:root{
+  --bg:#f3f5f7; --surface:rgb(255 255 255 / .84); --solid:#ffffff; --sunk:#e9edf1; --line:#d6dde4;
+  --fg:#16202b; --muted:#5d6b79; --accent:#2c5fe0; --accent-ink:#ffffff; --accent-soft:#e3e7fa;
+  --pos:#18794e; --pos-soft:#dcf1e6; --neg:#b4412c; --neg-soft:#f8e1db; --art-op:.22;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f141a; --surface:rgb(23 30 38 / .86); --solid:#171e26; --sunk:#1f2731; --line:#2c3642;
+  --fg:#e7ecf1; --muted:#93a1b0; --accent:#8fb0ff; --accent-ink:#0f141a; --accent-soft:#232b55;
+  --pos:#5fd39a; --pos-soft:#173a2a; --neg:#ff8c74; --neg-soft:#45231c; --art-op:.10; color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);min-height:100dvh;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(48px + env(safe-area-inset-bottom,0px))}
+[hidden]{display:none!important}
+img{max-width:100%}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--fg);background:var(--sunk)}
+.btn.danger{color:var(--neg)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{border:0;background:none;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.sub{color:var(--muted);font-size:14px}
+
+.art{position:fixed;right:max(-40px,env(safe-area-inset-right,0px));bottom:env(safe-area-inset-bottom,0px);width:min(780px,90vw);aspect-ratio:1000/915;max-width:100%;
+  background:url(/assets/background.webp) no-repeat right bottom/contain;opacity:var(--art-op);pointer-events:none;z-index:0}
+
+/* gate screens */
+.gate{position:relative;z-index:1;min-height:calc(100dvh - 60px);display:grid;place-items:center;padding-block:24px}
+.gate-card{width:min(420px,100%);background:var(--surface);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:24px;display:grid;gap:14px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);display:grid;place-items:center;position:relative;flex:none}
+.brand-mark::before,.brand-mark::after{content:"";position:absolute;width:15px;height:15px;border-radius:50%;top:9.5px;border:2px solid var(--accent)}
+.brand-mark::before{left:5px;background:#8fb0ff}.brand-mark::after{left:12px;background:#fff}
+.brand-name{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:-.01em}
+.gate-card h1{font-size:24px}
+.who-list{display:flex;flex-wrap:wrap;gap:8px}
+.who-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--solid);border-radius:999px;padding:4px 14px 4px 4px;font-weight:600}
+.who-btn:hover{border-color:var(--accent)}
+
+/* app */
+.wrap{position:relative;z-index:1;max-width:1120px;margin:0 auto;display:grid;gap:20px;padding-top:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.title-row{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.eyebrow{display:flex;align-items:center;gap:8px}
+.eyebrow .brand-mark{width:22px;height:22px;border-radius:6px}
+.eyebrow .brand-mark::before,.eyebrow .brand-mark::after{width:10px;height:10px;top:6px;border-width:1.5px}
+.eyebrow .brand-mark::before{left:3px}.eyebrow .brand-mark::after{left:8px}
+#groupName{font-family:var(--display);font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-.01em;border:1px dashed transparent;border-radius:6px;padding:0 4px;margin-left:-5px;background:transparent;width:100%;max-width:520px}
+#groupName:hover{border-color:var(--line)}
+#groupName:focus{border-color:var(--accent);outline:none}
+.head-actions{display:flex;gap:8px;flex-wrap:wrap}
+.banner{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 14px;color:var(--muted);font-size:14px}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;grid-template-areas:"main top" "main bottom";gap:20px;align-items:start}
+.grid > main{grid-area:main}.side-top{grid-area:top}.side-bottom{grid-area:bottom}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "main" "bottom"}}
+.side-top,.side-bottom{display:grid;gap:16px;min-width:0}
+.panel{-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:12px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.panel-head h2{font-size:18px}
+.panel-art{display:block;width:100%;height:auto;margin:-4px auto 0}
+
+.bal{display:grid;gap:10px}
+.bal-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center}
+.who{display:flex;align-items:center;gap:8px;min-width:0}
+.dot{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;flex:none}
+.who-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+.track{position:relative;height:10px;background:var(--sunk);border-radius:5px}
+.track::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted);opacity:.5}
+.fill{position:absolute;top:0;bottom:0;border-radius:5px}
+.fill.pos{left:50%;background:var(--pos)}
+.fill.neg{right:50%;background:var(--neg)}
+.amt-pos{color:var(--pos);font-weight:600}
+.amt-neg{color:var(--neg);font-weight:600}
+.amt-zero{color:var(--muted)}
+.bal-meta{grid-column:2 / 4;font-size:12px;color:var(--muted);margin-top:-6px}
+
+.settle-list{display:grid;gap:8px}
+.settle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--sunk);border-radius:8px;flex-wrap:wrap}
+.settle-txt{min-width:0}
+.allsquare{color:var(--pos);font-weight:600}
+
+.people{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 3px;background:var(--solid);font-size:13px}
+.chip .dot{width:20px;height:20px;font-size:10px}
+.chip .you{font-size:11px;color:var(--muted);padding-right:4px}
+.chip button{border:0;background:transparent;color:var(--muted);padding:0 6px;font-size:15px;line-height:1}
+.chip button:disabled{opacity:.3;cursor:not-allowed}
+.addp{display:flex;gap:8px}
+.addp input{flex:1;min-width:0}
+
+.activity{display:grid;gap:0;list-style:none;margin:0;padding:0}
+.activity li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.activity li:first-child{border-top:0}
+.activity .dot{width:22px;height:22px;font-size:10px}
+.act-txt{overflow-wrap:anywhere}
+.act-time{color:var(--muted);font-size:12px}
+.del{color:var(--neg)}
+
+input[type=text],input[type=password],input[type=number],input[type=date],select,textarea{border:1px solid var(--line);background:var(--solid);border-radius:8px;padding:9px 10px;width:100%;font-size:16px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar input{flex:1;min-width:160px}
+.seg{display:inline-flex;background:var(--sunk);border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--solid);color:var(--fg);box-shadow:0 1px 2px rgb(0 0 0 / .08)}
+.month{display:grid}
+.month-head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 2px 8px;border-bottom:1px solid var(--line)}
+.month-head h3{font-size:16px}
+.entry{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line);align-items:start}
+.date{display:grid;text-align:center;line-height:1.1;padding-top:2px}
+.date b{font-family:var(--display);font-size:20px}
+.date span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.e-main{min-width:0;display:grid;gap:4px}
+.e-title{font-weight:600;overflow-wrap:anywhere}
+.e-line{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--sunk);color:var(--muted);margin-right:6px;vertical-align:1px}
+.tag.pay{background:var(--pos-soft);color:var(--pos)}
+.splits{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--muted)}
+.splits .num{color:var(--fg)}
+.e-right{display:grid;justify-items:end;gap:4px}
+.e-amt{font-size:16px;font-weight:600}
+.e-you{font-size:12px}
+.e-actions .btn{padding:3px 8px;font-size:12px}
+.prov{font-size:12px;color:var(--muted)}
+.empty{text-align:center;padding:28px 16px 36px;color:var(--muted);display:grid;gap:8px;justify-items:center}
+.empty h3{color:var(--fg);font-size:20px}
+.empty-art{width:100%;max-width:260px;height:auto;margin-bottom:4px}
+
+dialog{border:1px solid var(--line);border-radius:14px;padding:0;background:var(--solid);color:var(--fg);width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 24px)}
+dialog::backdrop{background:rgb(10 14 20 / .45)}
+form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
+.sheet h2{font-size:22px}
+.field{display:grid;gap:5px;min-width:0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:460px){.row2{grid-template-columns:1fr}}
+.amt-in{position:relative}
+.amt-in input{font-family:var(--mono);font-size:20px;padding-left:30px}
+.amt-in .cur{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-family:var(--mono)}
+.parts{display:grid;gap:6px}
+.part{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px;align-items:center;padding:6px 8px;border-radius:8px;background:var(--sunk)}
+.part label{display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer}
+.part input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.part .share{text-align:right;font-size:14px}
+.part input[type=number]{padding:6px 8px;text-align:right;font-family:var(--mono)}
+.check{font-size:13px;padding:8px 10px;border-radius:8px}
+.check.ok{background:var(--pos-soft);color:var(--pos)}
+.check.bad{background:var(--neg-soft);color:var(--neg)}
+.sheet-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.err{color:var(--neg);font-size:13px;min-height:1em}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;font-weight:600;z-index:20;max-width:calc(100vw - 32px);text-align:center}
+@media (prefers-reduced-motion:no-preference){.entry.fresh{animation:in .6s ease both}@keyframes in{from{background:var(--accent-soft)}to{background:transparent}}}
+</style>
+</head>
+<body>
+<div class="art" aria-hidden="true"></div>
+
+<!-- Passcode -->
+<section class="gate" id="gatePass" hidden>
+  <form class="gate-card" id="fPass" novalidate>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Contri</span></div>
+    <h1>Enter the group passcode</h1>
+    <p class="sub" style="margin:0">Ask whoever set up this ledger for it. You only need to enter it once on this device.</p>
+    <div class="field"><label class="label" for="passIn">Passcode</label>
+      <input type="password" id="passIn" autocomplete="current-password" autocapitalize="off" spellcheck="false"></div>
+    <div class="err" id="passErr"></div>
+    <button class="btn primary" type="submit" id="passBtn">Open ledger</button>
+  </form>
+</section>
+
+<!-- Who are you -->
+<section class="gate" id="gateWho" hidden>
+  <div class="gate-card">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Contri</span></div>
+    <h1 id="whoTitle">Who are you?</h1>
+    <p class="sub" style="margin:0" id="whoSub">Your name goes on every expense you log or change, so the group can see who did what.</p>
+    <div class="who-list" id="whoList"></div>
+    <form class="addp" id="fWhoNew">
+      <input type="text" id="whoNew" placeholder="Not listed? Add your name" maxlength="30" aria-label="Your name">
+      <button class="btn primary" type="submit">Join</button>
+    </form>
+    <div class="err" id="whoErr"></div>
+  </div>
+</section>
+
+<!-- App -->
+<div class="wrap" id="app" hidden>
+  <header>
+    <div class="title-row">
+      <div class="eyebrow"><span class="brand-mark" aria-hidden="true"></span><span class="label">Contri</span></div>
+      <input id="groupName" type="text" value="Our Spending" aria-label="Group name" maxlength="60">
+      <div class="sub"><span id="summary">Loading…</span> · You're <b id="meName"></b> <button class="link" type="button" id="btnSwitch">Switch</button></div>
+    </div>
+    <div class="head-actions">
+      <select id="currency" aria-label="Currency" style="width:auto;font-size:14px">
+        <option value="USD">USD $</option><option value="INR">INR ₹</option><option value="EUR">EUR €</option><option value="GBP">GBP £</option><option value="CAD">CAD $</option>
+      </select>
+      <button class="btn" id="btnSettle" type="button">Record a payment</button>
+      <button class="btn primary" id="btnAdd" type="button">Add expense</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="grid">
+    <main class="panel" style="padding:16px 16px 4px">
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="Search descriptions or notes" aria-label="Search">
+        <div class="seg" id="personFilter" role="group" aria-label="Filter by person"></div>
+      </div>
+      <div id="ledger"></div>
+    </main>
+
+    <div class="side-top">
+      <section class="panel">
+        <div class="panel-head"><h2>Where we stand</h2><span class="label">Net</span></div>
+        <img class="panel-art" style="max-width:240px" src="/assets/where-we-stand.webp" width="600" height="484" alt="A person with a laptop sitting on a bar chart of coins">
+        <div class="bal" id="balances"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Settle up</h2><span class="label">Fewest payments</span></div>
+        <img class="panel-art" style="max-width:240px" src="/assets/settle-up.webp" width="600" height="562" alt="Two people shaking hands in front of a globe">
+        <div class="settle-list" id="settles"></div>
+      </section>
+    </div>
+
+    <div class="side-bottom">
+      <section class="panel">
+        <div class="panel-head"><h2>Activity</h2><span class="label">Every change</span></div>
+        <ul class="activity" id="activity"></ul>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>People</h2><span class="label" id="pcount"></span></div>
+        <img class="panel-art" style="max-width:250px" src="/assets/people.webp" width="600" height="388" alt="Friends sitting together and chatting">
+        <div class="people" id="people"></div>
+        <form class="addp" id="addPerson">
+          <input type="text" id="newPerson" placeholder="Add a name" maxlength="30" aria-label="New person's name">
+          <button class="btn" type="submit">Add</button>
+        </form>
+      </section>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlgExpense">
+  <form class="sheet" id="fExpense" novalidate>
+    <h2 id="fxTitle">Add expense</h2>
+    <div class="field"><label class="label" for="fxDesc">What was it for</label>
+      <input type="text" id="fxDesc" maxlength="80" placeholder="Costco run, PG&amp;E bill, dinner out"></div>
+    <div class="row2">
+      <div class="field"><label class="label" for="fxAmt">Amount</label>
+        <div class="amt-in"><span class="cur" id="fxCur">$</span><input type="number" id="fxAmt" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></div></div>
+      <div class="field"><label class="label" for="fxDate">Date</label><input type="date" id="fxDate"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label class="label" for="fxPayer">Paid by</label><select id="fxPayer"></select></div>
+      <div class="field"><label class="label" for="fxCat">Category</label>
+        <select id="fxCat"><option>Groceries</option><option>Dining</option><option>Rent</option><option>Utilities</option><option>Travel</option><option>Transport</option><option>Shopping</option><option>Fun</option><option>Health</option><option>Other</option></select></div>
+    </div>
+    <div class="field">
+      <span class="label">Split</span>
+      <div class="seg" id="fxMode" role="group" aria-label="Split method">
+        <button type="button" data-m="equal" aria-pressed="true">Equally</button>
+        <button type="button" data-m="exact" aria-pressed="false">Exact amounts</button>
+        <button type="button" data-m="percent" aria-pressed="false">Percentages</button>
+      </div>
+      <div class="parts" id="fxParts"></div>
+      <div class="check" id="fxCheck"></div>
+    </div>
+    <div class="field"><label class="label" for="fxNote">Note (optional)</label><input type="text" id="fxNote" maxlength="140" placeholder="Receipt in the shared album"></div>
+    <div class="err" id="fxErr"></div>
+    <div class="sheet-actions">
+      <button class="btn danger" type="button" id="fxDelete" hidden>Delete</button>
+      <span style="flex:1"></span>
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit" id="fxSave">Save expense</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgPay">
+  <form class="sheet" id="fPay" novalidate>
+    <h2 id="fpTitle">Record a payment</h2>
+    <p class="sub" style="margin:0">Use this when someone pays another person back, by Venmo, Zelle, cash or anything else.</p>
+    <div class="row2">
+      <div class="field"><label class="label" for="fpFrom">Who paid</label><select id="fpFrom"></select></div>
+      <div class="field"><label class="label" for="fpTo">Paid to</label><select id="fpTo"></select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label class="label" for="fpAmt">Amount</label>
+        <div class="amt-in"><span class="cur" id="fpCur">$</span><input type="number" id="fpAmt" min="0" step="0.01" inputmode="decimal"></div></div>
+      <div class="field"><label class="label" for="fpDate">Date</label><input type="date" id="fpDate"></div>
+    </div>
+    <div class="field"><label class="label" for="fpNote">Note (optional)</label><input type="text" id="fpNote" maxlength="140" placeholder="Zelle, October rent share"></div>
+    <div class="err" id="fpErr"></div>
+    <div class="sheet-actions">
+      <button class="btn danger" type="button" id="fpDelete" hidden>Delete</button>
+      <span style="flex:1"></span>
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save payment</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>
