@@ -62,9 +62,7 @@ button{cursor:pointer}
 .gate{position:relative;z-index:1;min-height:calc(100dvh - 60px);display:grid;place-items:center;padding-block:24px}
 .gate-card{width:min(420px,100%);background:var(--surface);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:24px;display:grid;gap:14px}
 .brand{display:flex;align-items:center;gap:10px}
-.brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);display:grid;place-items:center;position:relative;flex:none}
-.brand-mark::before,.brand-mark::after{content:"";position:absolute;width:15px;height:15px;border-radius:50%;top:9.5px;border:2px solid var(--accent)}
-.brand-mark::before{left:5px;background:#8fb0ff}.brand-mark::after{left:12px;background:#fff}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:#f5f4ef url(/icon-180.png?v=2) center/cover no-repeat;flex:none;box-shadow:0 0 0 1px rgb(0 0 0 / .08)}
 .brand-name{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:-.01em}
 .gate-card h1{font-size:24px}
 .who-list{display:flex;flex-wrap:wrap;gap:8px}
@@ -77,8 +75,6 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .title-row{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 320px}
 .eyebrow{display:flex;align-items:center;gap:8px}
 .eyebrow .brand-mark{width:22px;height:22px;border-radius:6px}
-.eyebrow .brand-mark::before,.eyebrow .brand-mark::after{width:10px;height:10px;top:6px;border-width:1.5px}
-.eyebrow .brand-mark::before{left:3px}.eyebrow .brand-mark::after{left:8px}
 #groupName{font-family:var(--display);font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-.01em;border:1px dashed transparent;border-radius:6px;padding:0 4px;margin-left:-5px;background:transparent;width:100%;max-width:520px}
 #groupName:hover{border-color:var(--line)}
 #groupName:focus{border-color:var(--accent);outline:none}
