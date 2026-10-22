@@ -5,7 +5,7 @@ const PALETTE = ["#2f3fa0","#b4412c","#18794e","#8a4fb3","#b07a12","#1f7f93","#c
 const POLL_MS = 8000;
 const LS = { pass: "contri.passcode", me: "contri.me" };
 
-const state = { people: [], entries: [], log: [], meta: { name: "Our Spending", currency: "USD" }, version: null, filter: "all", q: "", loaded: false };
+const state = { people: [], entries: [], log: [], trash: [], backups: [], meta: { name: "Our Spending", currency: "USD" }, version: null, filter: "all", q: "", loaded: false };
 let pass = lsGet(LS.pass), me = lsGet(LS.me), seen = new Set(), firstLoad = true;
 
 function lsGet(k){ try { return localStorage.getItem(k) || ""; } catch { return ""; } }
@@ -31,6 +31,8 @@ async function load(force){
   state.people = (data.people || []).sort((a,b) => (a.order||0) - (b.order||0));
   state.entries = data.entries || [];
   state.log = data.log || [];
+  state.trash = data.trash || [];
+  state.backups = data.backups || [];
   state.meta = data.meta || state.meta;
   state.loaded = true;
   fmtCache = {};
@@ -132,7 +134,7 @@ function render(){
   const few = state.people.length < 2;
   $("#btnAdd").disabled = few; $("#btnSettle").disabled = few;
   $("#btnAdd").title = few ? "Add at least two people first" : "";
-  renderBalances(b); renderSettles(b); renderPeople(); renderActivity(); renderFilter(); renderLedger();
+  renderBalances(b); renderSettles(b); renderPeople(); renderActivity(); renderFilter(); renderLedger(); renderSafety();
   firstLoad = false;
 }
 function renderBalances(b){
@@ -198,6 +200,8 @@ function renderActivity(){
       case "renamed": what = `renamed someone to <b>${esc(a.name)}</b>`; break;
       case "removed person": what = `removed <b>${esc(a.name)}</b>`; break;
       case "settings": what = `changed the group settings`; break;
+      case "restored": what = `restored ${thing}`; break;
+      case "restored backup": what = `restored the backup from <b>${esc(a.name)}</b>`; break;
       default: what = "made a change";
     }
     return `<li>${who ? dot(who) : dot(null)}<div><div class="act-txt"><b>${esc(name)}</b> ${what}</div><div class="act-time">${esc(ago(a.t))}</div></div></li>`;
@@ -519,8 +523,84 @@ async function armDelete(btn, dlg, errEl){
   if (!btn.dataset.arm){ btn.dataset.arm = "1"; btn.textContent = "Tap again to delete"; return; }
   try { await api("POST", { op: "delEntry", id: editing.id }); }
   catch (e){ if (e.status === 401){ dlg.close(); return handleErr(e); } errEl.textContent = e.message; return; }
-  dlg.close(); await load(true).catch(() => {}); route(); toast("Deleted");
+  dlg.close(); await load(true).catch(() => {}); route(); toast("Moved to Recently deleted");
 }
+/* ---------- backup, bin and export ---------- */
+const dt = $("#dlgTrash"), db2 = $("#dlgBackups");
+function renderSafety(){
+  $("#trashN").textContent = state.trash.length ? `(${state.trash.length})` : "";
+  $("#backupN").textContent = state.backups.length ? `(${state.backups.length})` : "";
+  if (dt.open) renderTrash();
+  if (db2.open) renderBackups();
+}
+const shortDate = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function renderTrash(){
+  const el = $("#trList");
+  if (!state.trash.length){ el.innerHTML = `<li class="bk-empty">Nothing here. Deleted items show up here for 30 days.</li>`; return; }
+  el.innerHTML = state.trash.map(e => {
+    const title = e.type === "payment" ? `${pName(e.paidBy)} paid ${pName(Object.keys(e.split || {})[0])}` : (e.desc || "Untitled");
+    const left = Math.max(0, 30 - Math.floor((Date.now() - (e.deletedAt || 0)) / 86400000));
+    return `<li><div class="bk-main"><span class="bk-title">${esc(title)} · <span class="num">${fmt(e.amount)}</span></span>
+      <span class="bk-sub">Deleted by ${esc(pName(e.deletedBy))} on ${esc(shortDate(e.deletedAt))} · ${left} day${left === 1 ? "" : "s"} left</span></div>
+      <div class="bk-btns"><button class="btn" type="button" data-restore="${esc(e.id)}">Restore</button></div></li>`;
+  }).join("");
+  el.querySelectorAll("[data-restore]").forEach(b => b.onclick = async () => {
+    b.disabled = true; $("#trErr").textContent = "";
+    try { await api("POST", { op: "restoreEntry", id: b.dataset.restore }); await load(true); route(); renderTrash(); toast("Restored"); }
+    catch (e){ b.disabled = false; if (e.status === 401){ dt.close(); return handleErr(e); } $("#trErr").textContent = e.message; }
+  });
+}
+function renderBackups(){
+  const el = $("#bkList");
+  if (!state.backups.length){ el.innerHTML = `<li class="bk-empty">The first backup is saved tonight. After that, one is added every day.</li>`; return; }
+  el.innerHTML = state.backups.map(b => `<li><div class="bk-main"><span class="bk-title">${esc(b.label)}</span>
+      <span class="bk-sub">${b.entries} entr${b.entries === 1 ? "y" : "ies"} · ${b.people} people · saved ${esc(new Date(b.t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</span></div>
+      <div class="bk-btns"><button class="btn" type="button" data-dl="${esc(b.key)}">Download</button><button class="btn danger" type="button" data-rs="${esc(b.key)}">Restore</button></div></li>`).join("");
+  el.querySelectorAll("[data-dl]").forEach(btn => btn.onclick = async () => {
+    btn.disabled = true; $("#bkErr").textContent = "";
+    try { const d = await api("GET", null, "?key=" + encodeURIComponent(btn.dataset.dl), "/api/backup");
+      const b = state.backups.find(x => x.key === btn.dataset.dl);
+      downloadCSV(d.backup.entries, d.backup.people, d.backup.meta, "backup-" + (b ? b.key : "copy")); }
+    catch (e){ if (e.status === 401){ db2.close(); return handleErr(e); } $("#bkErr").textContent = e.message; }
+    finally { btn.disabled = false; }
+  });
+  el.querySelectorAll("[data-rs]").forEach(btn => btn.onclick = async () => {
+    const b = state.backups.find(x => x.key === btn.dataset.rs);
+    if (!btn.dataset.arm){ btn.dataset.arm = "1"; btn.textContent = "Tap again to restore"; $("#bkErr").textContent = `This replaces everything with the copy from ${b ? b.label : "that day"} for everyone.`; return; }
+    btn.disabled = true;
+    try { await api("POST", { op: "restore", key: btn.dataset.rs }, "", "/api/backup"); await load(true); route(); renderBackups(); toast("Restored backup"); $("#bkErr").textContent = ""; }
+    catch (e){ btn.disabled = false; if (e.status === 401){ db2.close(); return handleErr(e); } $("#bkErr").textContent = e.message; }
+  });
+}
+$("#btnTrash").onclick = () => { $("#trErr").textContent = ""; renderTrash(); dt.showModal(); };
+$("#btnBackups").onclick = () => { $("#bkErr").textContent = ""; renderBackups(); db2.showModal(); };
+$("#btnExport").onclick = () => downloadCSV(state.entries, state.people, state.meta, "ledger");
+
+function downloadCSV(entries, people, meta, tag){
+  const names = Object.fromEntries((people || []).map(p => [p.id, p.name]));
+  const nm = id => names[id] || "Removed person";
+  const ids = (people || []).map(p => p.id);
+  for (const e of entries || []) for (const id of [e.paidBy, ...Object.keys(e.split || {})]) if (!ids.includes(id)) ids.push(id);
+  const money = c => (c / 100).toFixed(2);
+  const cell = v => { const s = String(v ?? ""); return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? "'" : "") + s.replace(/"/g, '""')}"` : s; };
+  const head = ["Date", "Type", "Description", "Category", "Amount", "Currency", "Paid by", ...ids.map(id => `${nm(id)} share`), "Note", "Photos", "Logged by", "Logged on", "Last edited by", "Last edited on"];
+  const rows = [...(entries || [])].sort((a, z) => (a.date || "").localeCompare(z.date || "")).map(e => [
+    e.date, e.type === "payment" ? "Payment" : "Expense",
+    e.type === "payment" ? `${nm(e.paidBy)} paid ${nm(Object.keys(e.split || {})[0])}` : e.desc,
+    e.type === "payment" ? "" : (e.category || ""), money(e.amount), (meta && meta.currency) || "USD", nm(e.paidBy),
+    ...ids.map(id => (e.split && id in e.split) ? money(e.split[id]) : ""),
+    e.note || "", (e.receipts || []).length || "", e.addedBy ? nm(e.addedBy) : "",
+    e.createdAt ? new Date(e.createdAt).toISOString().slice(0, 10) : "", e.editedBy ? nm(e.editedBy) : "", e.editedAt ? new Date(e.editedAt).toISOString().slice(0, 10) : ""]);
+  const csv = "\ufeff" + [head, ...rows].map(r => r.map(cell).join(",")).join("\r\n");
+  const slug = ((meta && meta.name) || "contri").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "contri";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = tag.startsWith("backup-") ? `${slug}-${tag}.csv` : `${slug}-${tag}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(entries && entries.length ? "Spreadsheet downloaded" : "Downloaded (no entries yet)");
+}
+
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => b.closest("dialog").close());
 $("#btnAdd").onclick = () => openExpense(null);
 $("#btnSettle").onclick = () => openPay(null);
@@ -550,7 +630,7 @@ function startPolling(){
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") poll(); });
 }
 async function poll(){
-  if (polling || document.visibilityState !== "visible" || !pass || dx.open || dp.open || dv.open) return;
+  if (polling || document.visibilityState !== "visible" || !pass || dx.open || dp.open || dv.open || db2.open) return;
   polling = true;
   try {
     if (await load(false)){

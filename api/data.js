@@ -1,9 +1,7 @@
 // GET  /api/data?v=N  -> whole ledger, or {unchanged:true} if version N is current
 // POST /api/data      -> one change: {op, ...}
 // Every request needs the group passcode in the "x-passcode" header.
-import { gate, K, parseMap, cleanPerson, cleanEntry, cleanMeta, Bad } from "./_lib.js";
-
-const LOG_KEEP = 300;
+import { gate, K, parseMap, cleanPerson, cleanEntry, cleanMeta, Bad, record, listBackups } from "./_lib.js";
 
 export default async function handler(req, res) {
   const db = await gate(req, res);
@@ -29,8 +27,8 @@ function body(req) {
 async function read(db, since) {
   const version = Number((await db.get(K.version)) || 0);
   if (since !== undefined && Number(since) === version) return { version, unchanged: true };
-  const [people, entries, meta, log] = await Promise.all([
-    db.hgetall(K.people), db.hgetall(K.entries), db.get(K.meta), db.lrange(K.log, 0, 99),
+  const [people, entries, trash, meta, log, backups] = await Promise.all([
+    db.hgetall(K.people), db.hgetall(K.entries), db.hgetall(K.trash), db.get(K.meta), db.lrange(K.log, 0, 99), listBackups(db),
   ]);
   let m = {};
   try { m = meta ? JSON.parse(meta) : {}; } catch {}
@@ -38,6 +36,8 @@ async function read(db, since) {
     version,
     people: Object.values(parseMap(people)),
     entries: Object.values(parseMap(entries)),
+    trash: Object.values(parseMap(trash)).sort((a, z) => (z.deletedAt || 0) - (a.deletedAt || 0)),
+    backups,
     meta: cleanMeta(m),
     log: (log || []).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(Boolean),
   };
@@ -62,8 +62,9 @@ async function write(db, b, whoRaw) {
     case "delPerson": {
       const p = people[b.id];
       if (!p) throw new Bad("That person isn't in the group.");
-      const entries = Object.values(parseMap(await db.hgetall(K.entries)));
-      if (entries.some(e => e.paidBy === b.id || (e.split && b.id in e.split))) throw new Bad(`${p.name} has entries, so they can't be removed.`);
+      const uses = e => e.paidBy === b.id || (e.split && b.id in e.split);
+      if (Object.values(parseMap(await db.hgetall(K.entries))).some(uses)) throw new Bad(`${p.name} has entries, so they can't be removed.`);
+      if (Object.values(parseMap(await db.hgetall(K.trash))).some(uses)) throw new Bad(`${p.name} has entries in Recently deleted, so they can't be removed yet.`);
       await db.hdel(K.people, b.id);
       log = { action: "removed person", name: p.name };
       break;
@@ -81,7 +82,6 @@ async function write(db, b, whoRaw) {
       if (prev) Object.assign(e, { addedBy: prev.addedBy ?? null, createdAt: prev.createdAt || now, editedBy: who, editedAt: now });
       else Object.assign(e, { addedBy: who, createdAt: now });
       await db.hset(K.entries, { [e.id]: JSON.stringify(e) });
-      for (const id of (prev && prev.receipts) || []) if (!(e.receipts || []).includes(id)) await db.del(K.receipt(id));
       log = { action: prev ? "edited" : "added", type: e.type, desc: e.desc, amount: e.amount, from: e.paidBy, to: e.type === "payment" ? Object.keys(e.split)[0] : null,
               before: prev && prev.amount !== e.amount ? prev.amount : undefined };
       break;
@@ -90,9 +90,22 @@ async function write(db, b, whoRaw) {
       const raw = await db.hget(K.entries, String(b.id || ""));
       if (!raw) throw new Bad("That entry was already deleted.");
       let e = {}; try { e = JSON.parse(raw); } catch {}
+      // Deleted items go to the bin for 30 days instead of disappearing.
+      await db.hset(K.trash, { [b.id]: JSON.stringify({ ...e, deletedAt: now, deletedBy: who }) });
       await db.hdel(K.entries, b.id);
-      for (const id of e.receipts || []) await db.del(K.receipt(id));
       log = { action: "deleted", type: e.type, desc: e.desc, amount: e.amount, from: e.paidBy, to: e.type === "payment" ? Object.keys(e.split || {})[0] : null };
+      break;
+    }
+    case "restoreEntry": {
+      const raw = await db.hget(K.trash, String(b.id || ""));
+      if (!raw) throw new Bad("That item isn't in Recently deleted any more.");
+      let e = {}; try { e = JSON.parse(raw); } catch {}
+      const missing = [e.paidBy, ...Object.keys(e.split || {})].filter(id => !people[id]);
+      if (missing.length) throw new Bad("Someone in this entry was removed from the group. Add them back, then restore it.");
+      delete e.deletedAt; delete e.deletedBy;
+      await db.hset(K.entries, { [e.id]: JSON.stringify(e) });
+      await db.hdel(K.trash, e.id);
+      log = { action: "restored", type: e.type, desc: e.desc, amount: e.amount, from: e.paidBy, to: e.type === "payment" ? Object.keys(e.split || {})[0] : null };
       break;
     }
     case "putMeta": {
@@ -105,8 +118,6 @@ async function write(db, b, whoRaw) {
       throw new Bad("Unknown change.");
   }
 
-  await db.lpush(K.log, JSON.stringify({ t: now, by: who, ...log }));
-  await db.ltrim(K.log, 0, LOG_KEEP - 1);
-  const version = await db.incr(K.version);
-  return { ok: true, version: Number(version) };
+  const version = await record(db, { by: who, ...log });
+  return { ok: true, version };
 }

@@ -30,6 +30,7 @@ export default async function handler(req, res) {
       if (data.length > MAX_CHARS) return res.status(400).json({ error: "That photo is too large. Try a smaller one." });
       if (!DATA.test(data)) return res.status(400).json({ error: "Only JPEG, PNG or WebP photos can be added." });
       await db.set(K.receipt(b.id), data, { ex: UNCLAIMED_SECONDS });
+      await db.sadd(K.photos, b.id);
       return res.status(200).json({ ok: true, id: b.id });
     }
     res.setHeader("Allow", "GET, POST");

@@ -184,6 +184,19 @@ form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
 .check.bad{background:var(--neg-soft);color:var(--neg)}
 .sheet-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .err{color:var(--neg);font-size:13px;min-height:1em}
+.bk-actions{display:flex;flex-wrap:wrap;gap:8px}
+.bk-actions .btn{flex:1 1 auto}
+.bk-n{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400}
+.bk-list{list-style:none;margin:0;padding:0;display:grid}
+.bk-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.bk-list li:first-child{border-top:0}
+.bk-list .bk-main{min-width:0;display:grid;gap:2px}
+.bk-list .bk-title{font-weight:600;overflow-wrap:anywhere}
+.bk-list .bk-sub{font-size:12px;color:var(--muted)}
+.bk-list .bk-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.bk-list .btn{padding:5px 10px;font-size:13px}
+.bk-empty{color:var(--muted);font-size:14px;padding:8px 0}
+#dlgTrash .sheet,#dlgBackups .sheet{display:grid;gap:12px;padding:16px 20px 20px;overflow:auto}
 .rx-row{display:flex;flex-wrap:wrap;gap:8px}
 .rx-row:empty{display:none}
 .rx{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;background:var(--sunk);border:1px solid var(--line)}
@@ -287,6 +300,15 @@ form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
           <button class="btn" type="submit">Add</button>
         </form>
       </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Backup &amp; export</h2><span class="label">Safety net</span></div>
+        <div class="bk-actions">
+          <button class="btn" type="button" id="btnExport">Download spreadsheet</button>
+          <button class="btn" type="button" id="btnTrash">Recently deleted <span class="bk-n" id="trashN"></span></button>
+          <button class="btn" type="button" id="btnBackups">Daily backups <span class="bk-n" id="backupN"></span></button>
+        </div>
+        <p class="sub" style="margin:0;font-size:13px">A full copy is saved automatically every night and kept for 30 days. Deleted items can be restored for 30 days.</p>
+      </section>
     </div>
   </div>
 </div>
@@ -359,6 +381,24 @@ form.sheet{display:grid;gap:14px;padding:20px;overflow:auto}
       <button class="btn primary" type="submit">Save payment</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="dlgTrash">
+  <div class="sheet">
+    <div class="panel-head"><h2>Recently deleted</h2><button class="btn ghost" type="button" data-close>Close</button></div>
+    <p class="sub" style="margin:0">Deleted expenses and payments stay here for 30 days. Restoring puts them back exactly as they were.</p>
+    <div class="err" id="trErr"></div>
+    <ul class="bk-list" id="trList"></ul>
+  </div>
+</dialog>
+
+<dialog id="dlgBackups">
+  <div class="sheet">
+    <div class="panel-head"><h2>Daily backups</h2><button class="btn ghost" type="button" data-close>Close</button></div>
+    <p class="sub" style="margin:0">Saved every night, last 30 kept. Restoring replaces everything with that day's copy. What's there now is saved first, so you can undo it.</p>
+    <div class="err" id="bkErr"></div>
+    <ul class="bk-list" id="bkList"></ul>
+  </div>
 </dialog>
 
 <dialog id="dlgView">

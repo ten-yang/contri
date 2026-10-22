@@ -17,7 +17,14 @@ export const K = {
   log: "ledger:log",
   lock: ip => "ledger:fail:" + ip,
   receipt: id => "ledger:receipt:" + id,
+  trash: "ledger:trash",
+  photos: "ledger:photos",
+  backups: "ledger:backups",
+  backup: key => "ledger:backup:" + key,
 };
+
+export const TRASH_DAYS = 30;
+export const BACKUP_KEEP = 30;
 
 export const CATEGORIES = ["Groceries","Dining","Rent","Utilities","Travel","Transport","Shopping","Fun","Health","Other"];
 export const MAX_RECEIPTS = 4;
@@ -120,4 +127,79 @@ export async function gate(req, res) {
     return null;
   }
   return db;
+}
+
+const LOG_KEEP = 300;
+// Append to the activity log and bump the version so open phones refresh.
+export async function record(db, entry) {
+  await db.lpush(K.log, JSON.stringify({ t: Date.now(), ...entry }));
+  await db.ltrim(K.log, 0, LOG_KEEP - 1);
+  return Number(await db.incr(K.version));
+}
+
+const parseJSON = (raw, fallback) => { try { return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } };
+
+// Everything needed to rebuild the ledger (photos stay where they are).
+export async function snapshot(db) {
+  const [people, entries, trash, meta] = await Promise.all([db.hgetall(K.people), db.hgetall(K.entries), db.hgetall(K.trash), db.get(K.meta)]);
+  return { t: Date.now(), meta: cleanMeta(parseJSON(meta, {})), people: Object.values(parseMap(people)), entries: Object.values(parseMap(entries)), trash: Object.values(parseMap(trash)) };
+}
+
+export async function listBackups(db) {
+  return ((await db.lrange(K.backups, 0, -1)) || []).map(x => parseJSON(x, null)).filter(Boolean);
+}
+
+// Save a backup under `key`. With onlyIfNew, an existing backup for that key is kept as-is.
+export async function saveBackup(db, key, label, { onlyIfNew = false } = {}) {
+  if (onlyIfNew && (await db.exists(K.backup(key)))) return false;
+  const snap = await snapshot(db);
+  await db.set(K.backup(key), JSON.stringify(snap));
+  const list = (await listBackups(db)).filter(b => b.key !== key);
+  list.unshift({ key, label, t: snap.t, entries: snap.entries.length, people: snap.people.length });
+  list.sort((a, z) => z.t - a.t);
+  for (const old of list.slice(BACKUP_KEEP)) await db.del(K.backup(old.key));
+  await db.del(K.backups);
+  const keep = list.slice(0, BACKUP_KEEP);
+  if (keep.length) await db.rpush(K.backups, ...keep.map(b => JSON.stringify(b)));
+  return true;
+}
+
+// Replace people, entries, deleted items and settings with a snapshot.
+export async function restoreSnapshot(db, snap) {
+  const toMap = arr => Object.fromEntries((arr || []).filter(x => x && x.id).map(x => [x.id, JSON.stringify(x)]));
+  for (const key of [K.people, K.entries, K.trash]) await db.del(key);
+  const people = toMap(snap.people), entries = toMap(snap.entries), trash = toMap(snap.trash);
+  if (Object.keys(people).length) await db.hset(K.people, people);
+  if (Object.keys(entries).length) await db.hset(K.entries, entries);
+  if (Object.keys(trash).length) await db.hset(K.trash, trash);
+  await db.set(K.meta, JSON.stringify(cleanMeta(snap.meta || {})));
+  // Photos referenced by the restored data must not expire.
+  for (const e of [...(snap.entries || []), ...(snap.trash || [])]) for (const id of e.receipts || []) await db.persist(K.receipt(id));
+}
+
+// Permanently remove deleted items older than TRASH_DAYS. Their photos are cleaned up by sweepPhotos.
+export async function purgeTrash(db) {
+  const cutoff = Date.now() - TRASH_DAYS * 86400000;
+  let n = 0;
+  for (const e of Object.values(parseMap(await db.hgetall(K.trash)))) {
+    if ((e.deletedAt || 0) < cutoff) { await db.hdel(K.trash, e.id); n++; }
+  }
+  return n;
+}
+
+// Delete photos that nothing uses any more: not current entries, not the bin, not any kept backup.
+export async function sweepPhotos(db) {
+  const used = new Set();
+  const add = list => { for (const x of list || []) for (const id of x.receipts || []) used.add(id); };
+  const snap = await snapshot(db);
+  add(snap.entries); add(snap.trash);
+  for (const b of await listBackups(db)) { const s = parseJSON(await db.get(K.backup(b.key)), {}); add(s.entries); add(s.trash); }
+  let n = 0;
+  for (const id of (await db.smembers(K.photos)) || []) {
+    if (used.has(id)) continue;
+    if (!(await db.exists(K.receipt(id)))) { await db.srem(K.photos, id); continue; }   // unclaimed upload already expired
+    if (Number(await db.ttl(K.receipt(id))) > 0) continue;                              // fresh upload, still waiting to be saved
+    await db.del(K.receipt(id)); await db.srem(K.photos, id); n++;
+  }
+  return n;
 }
