@@ -67,7 +67,7 @@ function handleErr(e, el){
 }
 
 /* ---------- routing ---------- */
-const SECTIONS = ["standing","activity","backup","settings","leave","expense","pay"];
+const SECTIONS = ["expenses","standing","activity","backup","settings","leave","expense","pay"];
 function route(){
   const m = location.pathname.match(/^\/g\/([A-Za-z0-9]{10})(?:\/([a-z]+))?(?:\/([a-z0-9]+))?\/?$/);
   const st = history.state || {};
@@ -174,6 +174,7 @@ async function renderGroup(r, my){
   document.title = `${g.meta.name} · Contri`;
   switch (r.sec){
     case "standing": return paint(viewStanding(g), "", true);
+    case "expenses": return paint(viewExpenses(g), "", true);
     case "activity": return paint(viewActivity(g), "", true);
     case "backup": return paint(viewBackup(g));
     case "settings": return paint(viewSettings(g));
@@ -418,7 +419,7 @@ function headerLine(g){
   const b = balances(g), mine = (b[g.me] || { net: 0 }).net;
   const n = g.people.filter(isActive).length;
   const st = mine > 0 ? `You're owed <b class="num pos">${fmt(mine, g.meta.currency)}</b>` : mine < 0 ? `You owe <b class="num neg">${fmt(-mine, g.meta.currency)}</b>` : "You're settled up";
-  return `${n} ${n === 1 ? "person" : "people"} · ${st}`;
+  return `${n} ${n === 1 ? "person" : "people"} · ${fmt(totalSpent(g), g.meta.currency)} spent · ${st}`;
 }
 function rxChip(e){
   const ids = e.receipts || [];
@@ -471,13 +472,45 @@ function viewGroup(g){
     <button type="button" class="btn primary lg" data-nav="/g/${g.meta.id}/expense">Add expense</button>
   </div>
   <div class="banner" id="offline" hidden></div>
-  ${ledgerHtml(g)}
+  ${g.entries.length ? `${balanceCard(g)}${settleCard(g)}` : ledgerHtml(g)}
   <section class="card menu">
-    <a href="/g/${g.meta.id}/standing" data-nav="/g/${g.meta.id}/standing">Where we stand &amp; settle up<span class="side">${n} ${n === 1 ? "person" : "people"}</span></a>
+    <a href="/g/${g.meta.id}/expenses" data-nav="/g/${g.meta.id}/expenses">Expenses<span class="side">${(() => { const k = g.entries.filter(e => e.type !== "payment").length; return k + " expense" + (k === 1 ? "" : "s"); })()}</span></a>
     <a href="/g/${g.meta.id}/activity" data-nav="/g/${g.meta.id}/activity">Activity<span class="side">${g.log.length >= 150 ? "150+" : g.log.length} change${g.log.length === 1 ? "" : "s"}</span></a>
     <a href="/g/${g.meta.id}/backup" data-nav="/g/${g.meta.id}/backup">Backup &amp; export<span class="side">${g.backups.length ? "Last saved " + esc(ago(g.backups[0].t)) : "Saved nightly"}</span></a>
     <a href="/g/${g.meta.id}/settings" data-nav="/g/${g.meta.id}/settings">Group settings<span class="side">${g.isCreator ? "Name, passcode, delete" : "Name, members, leave"}</span></a>
   </section>`;
+}
+function balanceCard(g){
+  const b = balances(g), cur = g.meta.currency;
+  const rows = Object.entries(b).filter(([id, v]) => isActive(pOf(g, id)) || v.net).sort((a, z) => z[1].net - a[1].net);
+  const max = Math.max(1, ...rows.map(([, v]) => Math.abs(v.net)));
+  return `<section class="card pad stack">
+    <div class="between"><h2>Where we stand</h2><span class="eyebrow">Net</span></div>
+    ${rows.length ? `<div class="bal">${rows.map(([id, v]) => { const p = pOf(g, id); const w = Math.abs(v.net) / max * 50;
+      return `<div class="bal-row2">
+        <div class="who">${dot(p, "sm")}<span class="who-name" title="${esc(p ? p.name : "")}">${esc(pName(g, id))}${p && p.leftAt ? " (former)" : ""}</span></div>
+        <div class="track" role="img" aria-label="${esc(p ? p.name : "")} ${v.net > 0 ? "gets back" : v.net < 0 ? "owes" : "is even"} ${fmt(Math.abs(v.net), cur)}"><div class="fill ${v.net >= 0 ? "pos" : "neg"}" style="width:${w}%"></div></div>
+        <div class="num ${v.net > 0 ? "pos" : v.net < 0 ? "neg" : "muted"}" style="font-weight:600;text-align:right">${fmt(v.net, cur, true)}</div>
+        <div class="bal-meta">Paid ${fmt(v.paid, cur)} · share ${fmt(v.share, cur)}</div>
+      </div>`; }).join("")}</div>`
+      : `<p class="empty-note">Balances show up once there are expenses.</p>`}
+  </section>`;
+}
+function settleCard(g){
+  const plan = settlePlan(balances(g)), cur = g.meta.currency;
+  return `<section class="card pad stack">
+    <div class="between"><h2>Settle up</h2><span class="eyebrow">Fewest payments</span></div>
+    ${g.people.filter(isActive).length < 2 ? `<p class="empty-note">Invite someone to start splitting.</p>`
+      : !plan.length ? `<div class="pos" style="font-weight:600">✓ Everyone is square</div>`
+      : `<div class="stack tight">${plan.map((s, i) => `<div class="sunkrow" style="justify-content:space-between;flex-wrap:wrap">
+          <div style="min-width:0"><b>${esc(pName(g, s.from))}</b> pays <b>${esc(pName(g, s.to))}</b><div class="num" style="font-size:17px;font-weight:600">${fmt(s.c, cur)}</div></div>
+          <button type="button" class="btn sm" data-act="settle" data-i="${i}">Mark paid</button></div>`).join("")}</div>`}
+  </section>`;
+}
+function viewExpenses(g){
+  return `${groupBack(g)}
+  <div class="between" style="align-items:center"><h1>Expenses</h1><button type="button" class="btn primary lg" style="min-height:44px" data-nav="/g/${g.meta.id}/expense">Add expense</button></div>
+  ${ledgerHtml(g)}`;
 }
 const groupBack = g => backLink(g.meta.name, "nav", `data-to="/g/${g.meta.id}"`);
 
@@ -501,21 +534,9 @@ function viewStanding(g){
     <button type="button" class="btn primary full" data-nav="/g/${g.meta.id}">Back to the group</button>`;
   }
   return `${groupBack(g)}
-  <h1>Where we stand</h1>
-  <section class="card pad" style="padding-top:8px;padding-bottom:6px">
-    <div class="between dash" style="padding-top:8px"><span class="num" style="font-size:22px;font-weight:600">${fmt(total, cur)}</span><span class="small muted">spent together</span></div>
-    ${rows.length ? rows.map(([id, v]) => { const p = pOf(g, id);
-      return `<div class="bal-row">${dot(p)}<div class="grow"><b style="font-size:14px">${esc(pName(g, id, { former: true }))}${id === g.me ? " (you)" : ""}</b><span class="tiny muted">Paid ${fmt(v.paid, cur)} · share ${fmt(v.share, cur)}</span></div>
-        <span class="num ${v.net > 0 ? "pos" : v.net < 0 ? "neg" : "muted"}" style="font-weight:600">${fmt(v.net, cur, true)}</span></div>`; }).join("")
-      : `<p class="empty-note">Balances show up once there are expenses.</p>`}
-  </section>
-  <section class="card pad stack" style="gap:10px">
-    <div class="between"><h2>Settle up</h2><span class="tiny muted">Fewest payments</span></div>
-    ${plan.length ? plan.map((s, i) => `<div class="sunkrow"><div class="grow"><span style="font-size:14px"><b>${esc(pName(g, s.from))}</b> pays <b>${esc(pName(g, s.to))}</b></span><span class="num" style="font-weight:600">${fmt(s.c, cur)}</span></div>
-      <button type="button" class="btn sm" data-act="settle" data-i="${i}">Mark paid</button></div>`).join("")
-      + `<p class="tiny muted">"Mark paid" records the payment in the group, so everyone's balance updates.</p>`
-      : `<p class="empty-note">Nothing to settle yet.</p>`}
-  </section>
+  <h1>Balances</h1>
+  ${balanceCard(g)}
+  ${settleCard(g)}
   <button type="button" class="btn lg full" data-nav="/g/${g.meta.id}/pay" ${g.people.filter(isActive).length < 2 ? "disabled" : ""}>Record a payment</button>`;
 }
 
@@ -816,7 +837,7 @@ async function saveExpense(g){
     await loadGroup(g.meta.id);
     S.fresh = new Set([entry.id]);
     toast(ED.e ? "Saved changes" : "Expense added");
-    go(`/g/${g.meta.id}`);
+    go(`/g/${g.meta.id}/expenses`);
   } catch (e){ handleErr(e, err); }
   finally { btn.disabled = false; }
 }

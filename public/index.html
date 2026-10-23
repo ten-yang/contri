@@ -187,7 +187,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 
 .bal-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line2)}
 .bal-row:last-child{border-bottom:0}
-.bal-row .grow{flex:1;min-width:0;display:flex;flex-direction:column}
+.bal-row .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.bal{display:grid;gap:10px}
+.bal-row2{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center}
+.bal-row2 .who{display:flex;align-items:center;gap:8px;min-width:0}
+.who-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-size:14px}
+.bal-meta{grid-column:2 / 4;font-size:12px;color:var(--muted);margin-top:-6px}
+.track{position:relative;height:10px;background:var(--sunk);border-radius:4px}
+.track::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted);opacity:.45}
+.fill{position:absolute;top:0;bottom:0;border-radius:4px}
+.fill.pos{left:50%;background:var(--pos)}
+.fill.neg{right:50%;background:var(--neg)}
 .illus{display:block;width:100%;max-width:300px;margin:0 auto}
 .center{text-align:center}
 .empty-note{color:var(--muted);font-size:14px;padding:6px 0}
@@ -210,6 +220,6 @@ dialog h2{font-size:22px}
 <div class="wave" id="wave" aria-hidden="true" hidden><svg viewBox="0 0 390 200" preserveAspectRatio="none"><path d="M0 92 C 70 40, 150 140, 245 86 S 360 52, 390 64 V200 H0Z" fill="#8a9a78" opacity=".16"/><path d="M0 132 C 90 96, 180 170, 280 124 S 370 108, 390 116 V200 H0Z" fill="#8a9a78" opacity=".14"/></svg></div>
 <main id="view"><div class="loading">Loading…</div></main>
 <dialog id="dlg"></dialog>
-<script src="/app.js?v=3"></script>
+<script src="/app.js?v=4"></script>
 </body>
 </html>
