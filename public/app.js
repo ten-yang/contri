@@ -430,7 +430,10 @@ function rxChip(e){
   if (days <= 0) return `<span class="chip gone">${label} deleted after 30 days</span>`;
   return `<span class="chip" role="button" tabindex="0" data-act="viewRx" data-id="${esc(e.id)}">${label} · deletes in ${days} day${days === 1 ? "" : "s"}</span>`;
 }
-function entryRow(g, e){
+function entryRow(g, e, pf){
+  let mine = "";
+  if (pf){ const delta = (e.paidBy === pf ? e.amount : 0) - ((e.split || {})[pf] || 0);
+    if (delta) mine = `<span class="num tiny ${delta > 0 ? "pos" : "neg"}" style="font-weight:600">${esc(pName(g, pf))} ${fmt(delta, g.meta.currency, true)}</span>`; }
   const d = new Date((e.date || today()) + "T12:00:00");
   const cur = g.meta.currency;
   const sub = e.type === "payment"
@@ -443,13 +446,17 @@ function entryRow(g, e){
   return `<div class="entry${fresh}" role="button" tabindex="0" data-act="openEntry" data-id="${esc(e.id)}">
     <div class="day"><b>${d.getDate()}</b><br><span>${esc(d.toLocaleDateString(undefined, { weekday: "short" }))}</span></div>
     <div class="grow"><span class="title">${title}</span><span class="tiny muted">${sub}</span>${e.note && e.type !== "payment" ? `<span class="tiny muted">${esc(e.note)}</span>` : ""}${rxChip(e)}</div>
-    <span class="amt">${fmt(e.amount, cur)}</span></div>`;
+    <div class="stack" style="gap:2px;align-items:flex-end"><span class="amt">${fmt(e.amount, cur)}</span>${mine}</div></div>`;
 }
-function ledgerHtml(g){
+function ledgerHtml(g, f = {}){
   if (!g.entries.length) return `<section class="card pad stack center" style="align-items:center">
     <img class="illus" style="max-width:220px" src="/assets/empty.webp" width="640" height="592" alt="">
     <h2>No expenses yet</h2><p class="small muted">Log the first one: who paid, how much, and who it was for.</p></section>`;
-  const list = [...g.entries].sort((a, z) => (z.date || "").localeCompare(a.date || "") || (z.createdAt || 0) - (a.createdAt || 0));
+  const q = (f.q || "").trim().toLowerCase(), pf = f.pf && f.pf !== "all" ? f.pf : "";
+  const list = g.entries.filter(e => !pf || e.paidBy === pf || (e.split && pf in e.split))
+    .filter(e => !q || [e.desc, e.note, e.category].some(x => (x || "").toLowerCase().includes(q)))
+    .sort((a, z) => (z.date || "").localeCompare(a.date || "") || (z.createdAt || 0) - (a.createdAt || 0));
+  if (!list.length) return `<section class="card pad center"><p class="muted" style="margin:0">Nothing matches that${q ? " search" : " filter"}.</p></section>`;
   const months = new Map();
   for (const e of list){ const k = (e.date || "").slice(0, 7); if (!months.has(k)) months.set(k, []); months.get(k).push(e); }
   let html = "";
@@ -457,7 +464,7 @@ function ledgerHtml(g){
     const [y, m] = k.split("-").map(Number);
     const label = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
     const tot = es.filter(e => e.type !== "payment").reduce((s, e) => s + e.amount, 0);
-    html += `<section class="card ledger"><div class="month-head"><b style="font-size:15px">${esc(label)}</b><span class="num small muted">${fmt(tot, g.meta.currency)}</span></div>${es.map(e => entryRow(g, e)).join("")}</section>`;
+    html += `<section class="card ledger"><div class="month-head"><b style="font-size:15px">${esc(label)}</b><span class="num small muted">${fmt(tot, g.meta.currency)}</span></div>${es.map(e => entryRow(g, e, pf)).join("")}</section>`;
   }
   return html;
 }
@@ -510,7 +517,19 @@ function settleCard(g){
 function viewExpenses(g){
   return `${groupBack(g)}
   <div class="between" style="align-items:center"><h1>Expenses</h1><button type="button" class="btn primary lg" style="min-height:44px" data-nav="/g/${g.meta.id}/expense">Add expense</button></div>
-  ${ledgerHtml(g)}`;
+  ${g.entries.length ? `<div class="stack tight">
+    <input type="search" id="exQ" placeholder="Search descriptions or notes" aria-label="Search expenses" value="${esc(S.ui.q || "")}">
+    ${filterChips(g)}
+  </div>` : ""}
+  <div id="exList">${ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf })}</div>`;
+}
+function filterChips(g){
+  const used = new Set(g.entries.flatMap(e => [e.paidBy, ...Object.keys(e.split || {})]));
+  const ppl = g.people.filter(p => isActive(p) || used.has(p.id));
+  if (ppl.length < 2) return "";
+  const pf = S.ui.pf || "all";
+  return `<div class="chips" role="group" aria-label="Filter by person">${[{ id: "all", name: "Everyone" }, ...ppl].map(p =>
+    `<button type="button" data-act="pf" data-id="${esc(p.id)}" aria-pressed="${pf === p.id}">${esc(p.name)}${p.id === g.me ? " (you)" : ""}</button>`).join("")}</div>`;
 }
 const groupBack = g => backLink(g.meta.name, "nav", `data-to="/g/${g.meta.id}"`);
 
@@ -977,6 +996,9 @@ const ACT = {
       .catch(err => img.replaceWith(Object.assign(document.createElement("p"), { className: "small muted", textContent: err.message }))));
   },
   settle: el => { const g = G(); const s = settlePlan(balances(g))[+el.dataset.i]; if (s) go(`/g/${g.meta.id}/pay`, { from: s.from, to: s.to, c: s.c }); },
+  pf: el => { S.ui.pf = el.dataset.id; const g = G();
+    V.querySelectorAll("[data-act=pf]").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === S.ui.pf));
+    V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf }); },
   actF: el => { S.ui.actFilter = el.dataset.f; render(); },
   csv: () => { const g = G(); downloadCSV(g.entries, g.people, g.meta, "now"); },
   dlBackup: async el => {
@@ -1030,6 +1052,9 @@ V.addEventListener("click", ev => {
 });
 V.addEventListener("keydown", ev => {
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches("[role=button][data-act]")){ ev.preventDefault(); ev.target.click(); }
+});
+V.addEventListener("input", ev => {
+  if (ev.target.id === "exQ"){ S.ui.q = ev.target.value; const g = G(); if (g) V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf }); }
 });
 V.addEventListener("change", ev => {
   if (ev.target.id === "rcOk"){ V.querySelector("#rcDone").disabled = !ev.target.checked; }

@@ -98,6 +98,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 .tabs{display:flex;background:var(--seg);border-radius:10px;padding:4px;gap:4px}
 .tabs button{flex:1;min-height:44px;border:0;border-radius:8px;background:transparent;font-weight:600;font-size:15px;color:var(--muted)}
 .tabs button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.chips{display:inline-flex;flex-wrap:wrap;gap:2px;background:var(--seg);border-radius:10px;padding:3px;align-self:flex-start;max-width:100%}
+.chips button{min-height:34px;padding:0 12px;border:0;border-radius:8px;background:transparent;font-weight:600;font-size:13px;color:var(--muted)}
+.chips button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .seg{display:flex;background:var(--seg);border-radius:10px;padding:3px;gap:2px}
 .seg button{flex:1;min-height:38px;border:0;border-radius:8px;background:transparent;font-weight:600;font-size:14px;color:var(--muted)}
 .seg button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
@@ -220,6 +223,6 @@ dialog h2{font-size:22px}
 <div class="wave" id="wave" aria-hidden="true" hidden><svg viewBox="0 0 390 200" preserveAspectRatio="none"><path d="M0 92 C 70 40, 150 140, 245 86 S 360 52, 390 64 V200 H0Z" fill="#8a9a78" opacity=".16"/><path d="M0 132 C 90 96, 180 170, 280 124 S 370 108, 390 116 V200 H0Z" fill="#8a9a78" opacity=".14"/></svg></div>
 <main id="view"><div class="loading">Loading…</div></main>
 <dialog id="dlg"></dialog>
-<script src="/app.js?v=4"></script>
+<script src="/app.js?v=5"></script>
 </body>
 </html>
