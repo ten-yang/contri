@@ -4,7 +4,7 @@
 import {
   handle, body, ipOf, K, Bad, need, rid, newGid, GID, LEGACY_GID, CURRENCIES, PHOTO_DAYS,
   hashSecret, secretOk, legacyPasscodeOk, requireUser, checkLock, addFail, memberGate, loadMeta, saveMeta,
-  publicMeta, parseMap, parseJSON, record, cleanEntry, pickColor, listBackups,
+  publicMeta, parseMap, parseJSON, record, cleanEntry, pickColor, listBackups, cleanEmoji, cleanColor,
 } from "./_lib.js";
 import { people as loadPeople, activeMembers, checkCanLeave, doLeave, deleteGroup } from "./_groups.js";
 
@@ -126,7 +126,7 @@ async function write(db, user, b, ip) {
     const gid = newGid();
     const pid = rid(12);
     const now = Date.now();
-    const meta = { id: gid, name, currency, creator: user.id, pc: hashSecret(passcode), pcVer: 1, createdAt: now };
+    const meta = { id: gid, name, currency, creator: user.id, pc: hashSecret(passcode), pcVer: 1, createdAt: now, emoji: cleanEmoji(b.emoji), color: cleanColor(b.color) };
     await saveMeta(db, meta);
     await db.hset(K.g(gid).people, { [pid]: JSON.stringify({ id: pid, name: user.username, color: pickColor([]), order: now, uid: user.id }) });
     await db.sadd(K.groups, gid);

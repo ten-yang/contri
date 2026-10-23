@@ -208,8 +208,20 @@ export async function memberGate(db, gid, user, { allowStale = false } = {}) {
 }
 
 export function publicMeta(m) {
-  return { id: m.id, name: m.name, currency: m.currency, creator: m.creator, createdAt: m.createdAt };
+  return { id: m.id, name: m.name, currency: m.currency, creator: m.creator, createdAt: m.createdAt, emoji: m.emoji || "", color: m.color || "" };
 }
+
+// A group's or category's look: one emoji (any, from the keyboard) and a color from a fixed set.
+export const LOOK_COLORS = ["#1f7f93", "#4f6146", "#a8452a", "#b07a12", "#8a4fb3", "#2f5fa0"];
+export function cleanEmoji(v) {
+  const s = String(v ?? "").trim();
+  if (!s) return "";
+  let first = s;
+  try { first = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)][0].segment; } catch { first = [...s].slice(0, 2).join(""); }
+  need(first.length <= 16 && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first), "Pick an emoji.");
+  return first;
+}
+export function cleanColor(v) { return LOOK_COLORS.includes(v) ? v : ""; }
 
 export const PALETTE = ["#4f6146", "#a8452a", "#8a4fb3", "#b07a12", "#1f7f93", "#2f5fa0", "#c2417c", "#6b5b3e", "#2e6f45", "#7a6f5c"];
 export function pickColor(people) {
@@ -250,6 +262,7 @@ export function cleanEntry(e, people) {
     out.desc = str(e.desc, 80);
     need(out.desc.length > 0, "Add a short description.");
     out.category = str(e.category, CATEGORY_MAX) || "Other";
+    if (e.catEmoji) out.catEmoji = cleanEmoji(e.catEmoji);
     out.mode = ["equal", "exact", "percent"].includes(e.mode) ? e.mode : "equal";
     if (out.mode === "percent" && e.pct && typeof e.pct === "object") {
       out.pct = {};
