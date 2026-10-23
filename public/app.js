@@ -44,9 +44,56 @@ const ICON = {
   info: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f6146" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>`,
   key: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4f6146" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M17 6l3 3"/><path d="M15 8l2 2"/></svg>`,
   check: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>`,
+  undo: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>`,
   camera: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>`,
 };
 const backLink = (label, act = "back", extra = "") => `<button type="button" class="back" data-act="${act}" ${extra}>${ICON.back}${esc(label)}</button>`;
+
+/* ---------- looks: faces, group emoji, category icons ---------- */
+const LOOK_COLORS = ["#1f7f93","#4f6146","#a8452a","#b07a12","#8a4fb3","#2f5fa0"];
+const QUICK_EMOJI = ["🏖️","🏞️","🏠","🍕","✈️"];
+const faces = (ps, cls = "sm") => ps.length ? `<span class="faces" aria-hidden="true">${ps.map(p => dot(p, cls)).join("")}</span>` : "";
+function firstEmoji(v){
+  const s = String(v || "").trim(); if (!s) return "";
+  let parts; try { parts = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)].map(x => x.segment); } catch { parts = [...s]; }
+  const e = parts.reverse().find(x => /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(x));
+  return e || "";
+}
+function groupEmo(meta, cls = ""){
+  const c = meta.color || "";
+  const bg = c ? c + "26" : "var(--tint)";
+  return meta.emoji ? `<span class="gemo ${cls}" style="background:${esc(bg)}" aria-hidden="true">${esc(meta.emoji)}</span>`
+    : `<span class="gemo ${cls}" style="background:${esc(bg)};color:${esc(c || "var(--accent)")};font-size:22px" aria-hidden="true">${esc(initial(meta.name))}</span>`;
+}
+const SVG = p => `<svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const CAT_ICONS = {
+  groceries: ["#8a4fb3", '<path d="M5 8h14l-1.5 11a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2zM9 8V6a3 3 0 0 1 6 0v2"/>'],
+  dining: ["#a8452a", '<path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10M17 3c-2 0-3 2-3 5s1 4 3 4v9"/>'],
+  lodging: ["#4f6146", '<path d="M3 20V9l9-5 9 5v11M9 20v-6h6v6"/>'],
+  rent: ["#2f5fa0", '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M17 6l3 3M15 8l2 2"/>'],
+  utilities: ["#b07a12", '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'],
+  travel: ["#1f7f93", '<path d="M2 16l20-7-3-2-6 2-5-5-2 1 3 6-4 1-2-2-1 1 2 4z"/>'],
+  transport: ["#2f5fa0", '<path d="M5 17V11l2-5h10l2 5v6M3 17h18M7 17v2M17 17v2"/><circle cx="7.5" cy="13.5" r=".8"/><circle cx="16.5" cy="13.5" r=".8"/>'],
+  shopping: ["#c2417c", '<path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/>'],
+  fun: ["#1f7f93", '<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>'],
+  health: ["#a8452a", '<path d="M20.8 5.6a5 5 0 0 0-8.8-1 5 5 0 0 0-8.8 1C2 9.5 6 13.5 12 20c6-6.5 10-10.5 8.8-14.4z"/>'],
+  other: ["#7a6f5c", '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'],
+  payment: ["#2e6f45", '<path d="M5 12h14M13 6l6 6-6 6"/>'],
+  custom: ["#6b5b3e", '<path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/>'],
+};
+function catEmojis(g){
+  const m = {};
+  for (const e of [...g.entries].sort((a, z) => (a.createdAt || 0) - (z.createdAt || 0))) if (e.catEmoji && e.category) m[e.category.toLowerCase()] = e.catEmoji;
+  return m;
+}
+function catIcon(g, cat, size = 38, payer, emojis){
+  const k = String(cat || "Other").toLowerCase();
+  const em = (emojis || catEmojis(g))[k];
+  const [c, path] = k === "payment" ? CAT_ICONS.payment : em ? ["#7a6f5c", ""] : (CAT_ICONS[k] || CAT_ICONS.custom);
+  const inner = em && k !== "payment" ? `<span style="font-size:${Math.round(size * .5)}px">${esc(em)}</span>` : SVG(path);
+  return `<span class="cic" style="width:${size}px;height:${size}px;border-radius:${Math.round(size * .29)}px;background:${c}1f;color:${c}" aria-hidden="true">${inner}${payer ? `<span class="payer">${dot(payer, "xs")}</span>` : ""}</span>`;
+}
+const youOr = (g, id) => id === g.me ? "you" : pName(g, id);
 
 /* ---------- API ---------- */
 class ApiError extends Error { constructor(status, msg, data){ super(msg); this.status = status; this.data = data || {}; } }
@@ -67,7 +114,7 @@ function handleErr(e, el){
 }
 
 /* ---------- routing ---------- */
-const SECTIONS = ["expenses","standing","activity","backup","settings","leave","expense","pay"];
+const SECTIONS = ["expenses","standing","activity","backup","settings","leave","expense","pay","item"];
 function route(){
   const m = location.pathname.match(/^\/g\/([A-Za-z0-9]{10})(?:\/([a-z]+))?(?:\/([a-z0-9]+))?\/?$/);
   const st = history.state || {};
@@ -181,6 +228,7 @@ async function renderGroup(r, my){
     case "leave": return paint(viewLeave(g));
     case "expense": return paint(viewExpense(g, r.id), "", false, () => bindExpense(g, r.id));
     case "pay": return paint(viewPay(g, r.id, r.st), "", false, () => bindPay(g, r.id));
+    case "item": return paint(viewItem(g, r.id), "", false, () => bindItem(g));
   }
   paint(viewGroup(g), "", true);
 }
@@ -253,36 +301,35 @@ function viewRecovery(){
 }
 
 /* ---------- home ---------- */
+function greeting(){ const h = new Date().getHours(); return h < 12 ? "Good morning," : h < 17 ? "Good afternoon," : "Good evening,"; }
 function viewHome(){
   const u = S.user, gs = S.home.groups;
-  const owed = {}, owe = {};
-  for (const g of gs){ if (g.needPasscode || !g.net) continue; const t = g.net > 0 ? owed : owe; t[g.currency] = (t[g.currency] || 0) + Math.abs(g.net); }
-  const lines = (t, cls) => Object.keys(t).length ? Object.entries(t).map(([c, v]) => `<span class="big">${fmt(v, c)}</span>`).join("") : `<span class="none">${fmt(0, gs[0] ? gs[0].currency : "USD")}</span>`;
-  const multi = new Set(gs.filter(g => g.net).map(g => g.currency)).size > 1;
+  const net = {};
+  for (const g of gs){ if (g.needPasscode) continue; net[g.currency] = (net[g.currency] || 0) + (g.net || 0); }
+  const curs = Object.keys(net).sort((a, z) => Math.abs(net[z]) - Math.abs(net[a]));
+  if (!curs.length) curs.push(gs[0] ? gs[0].currency : "USD");
+  const cline = c => { const v = net[c] || 0;
+    return `<div class="cline"><span class="csym" aria-hidden="true">${esc(curSymbol(c))}</span><span class="l">${v > 0 ? "You're owed" : v < 0 ? "You owe" : "You're settled up"}</span><b style="color:${v > 0 ? "#d9ead0" : v < 0 ? "#ffd2c2" : "#fff"}">${fmt(Math.abs(v), c)}</b></div>`; };
   const settles = gs.flatMap(g => (g.settles || []).map(s => ({ ...s, g })));
-  return `<div class="topbar">
-    <div class="row" style="gap:8px"><span class="brand-mark" style="width:28px;height:28px;border-radius:8px" aria-hidden="true"></span><span style="font-family:var(--display);font-weight:700;font-size:22px">Hi, ${esc(u.username)}</span></div>
-    <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button>
-  </div>
-  <section class="card pad stack">
-    <span class="eyebrow dash">Where you stand · all groups</span>
-    <div class="grid2">
-      <div class="ticket owed"><span class="small">You're owed</span>${lines(owed)}</div>
-      <div class="ticket owe"><span class="small">You owe</span>${lines(owe)}</div>
-    </div>
-    ${multi ? `<span class="tiny muted">Each currency is totaled on its own, since amounts aren't converted.</span>` : ""}
+  return `<div class="topbar"><span class="greet">${greeting()}</span>
+    <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button></div>
+  <h1 style="font-size:30px;margin-top:-12px;overflow-wrap:anywhere">${esc(u.username)}</h1>
+  <section class="hero" aria-label="Where you stand, by currency" style="padding:14px 20px">
+    <div class="lbl" style="font-size:11px;margin-bottom:4px">Overall, by currency</div>
+    ${curs.map(cline).join("")}
   </section>
   ${settles.length ? `<section class="card pad stack" style="gap:10px">
     <div class="between"><h2>Settle up</h2><span class="tiny muted">${settles.length} payment${settles.length === 1 ? "" : "s"}</span></div>
     ${settles.map((s, i) => `<div class="sunkrow"><div class="grow"><span style="font-size:14px">${s.mine === "get" ? `<b>${esc(s.fromName)}</b> pays you` : `You pay <b>${esc(s.toName)}</b>`} <b class="num">${fmt(s.c, s.g.currency)}</b></span><span class="tiny muted">${esc(s.g.name)}</span></div>
       <button type="button" class="btn sm" data-act="homeSettle" data-i="${i}">Mark paid</button></div>`).join("")}
   </section>` : ""}
-  <section class="stack tight" style="border-top:2px dashed var(--border);padding-top:12px">
-    <h2 style="margin:0 2px">Your groups</h2>
-    ${gs.map(g => `<a class="tile" href="/g/${esc(g.id)}" data-nav="/g/${esc(g.id)}">
-      <span class="ini ${g.net < 0 ? "neg" : ""}">${esc(initial(g.name))}</span>
-      <span class="grow"><b>${esc(g.name)}</b><span class="tiny muted">${g.needPasscode ? "Passcode changed: tap to enter the new one" : `${g.people} ${g.people === 1 ? "person" : "people"} · updated ${esc(ago(g.updated))}`}</span></span>
-      ${g.needPasscode ? ICON.chev : `<span class="num ${g.net > 0 ? "pos" : g.net < 0 ? "neg" : "muted"}" style="font-weight:600;font-size:14px">${g.net ? fmt(g.net, g.currency, true) : "Settled"}</span>`}
+  <section class="stack tight">
+    <h2 style="margin:4px 2px 0">Your groups</h2>
+    ${gs.map(g => `<a class="gcard" href="/g/${esc(g.id)}" data-nav="/g/${esc(g.id)}">
+      <span class="stripe" style="background:${esc(g.color || "var(--accent)")}"></span>
+      ${groupEmo(g)}
+      <span class="grow"><b>${esc(g.name)}</b><span class="meta">${g.needPasscode ? "Passcode changed: tap to enter the new one" : `${faces((g.faces || []), "xs")}<span>Updated ${esc(ago(g.updated))}</span>`}</span></span>
+      ${g.needPasscode ? ICON.chev : `<span class="right"><span class="v ${g.net > 0 ? "pos" : g.net < 0 ? "neg" : "muted"}" style="display:block">${fmt(Math.abs(g.net || 0), g.currency)}</span><span class="t">${g.net > 0 ? "you're owed" : g.net < 0 ? "you owe" : "settled"}</span></span>`}
     </a>`).join("")}
   </section>
   <div class="grid2" style="margin-top:auto">
@@ -290,6 +337,20 @@ function viewHome(){
     <button type="button" class="btn primary lg" data-act="create">Create a group</button>
   </div>`;
 }
+function lookPicker(){
+  const em = S.ui.emoji !== undefined ? S.ui.emoji : QUICK_EMOJI[0];
+  const col = S.ui.color || LOOK_COLORS[0];
+  return `<div class="field look"><span class="eyebrow">Pick a look</span>
+    <div class="row" style="gap:12px;align-items:center">
+      <label class="emo-pick" id="emoTile" style="background:${col}26"><span id="emoShow" aria-hidden="true">${esc(em)}</span><input id="gEmoji" name="emoji" type="text" value="${esc(em)}" autocomplete="off" aria-label="Group emoji. Type or pick any emoji"></label>
+      <div style="font-size:13px;line-height:1.45"><b style="font-size:14px">Tap to use any emoji</b><br><span class="muted">Your keyboard's emoji picker opens. Or pick a quick one below.</span></div>
+    </div>
+    <div class="quick" role="group" aria-label="Quick emoji">${QUICK_EMOJI.map(x => `<button type="button" data-act="quickEmo" data-e="${esc(x)}" aria-pressed="${x === em}" aria-label="Use ${esc(x)}">${esc(x)}</button>`).join("")}</div>
+    <div class="field" style="gap:8px"><span class="eyebrow" id="colLbl">Color</span>
+      <div class="colors" role="radiogroup" aria-labelledby="colLbl">${LOOK_COLORS.map((c, i) => `<label style="background:${c}"><input type="radio" name="color" value="${c}" ${c === col ? "checked" : ""} aria-label="Color ${i + 1}"></label>`).join("")}</div></div>
+  </div>`;
+}
+
 function viewEmptyHome(){
   const u = S.user;
   return `<div class="topbar">
@@ -377,6 +438,7 @@ function viewCreate(){
     <div class="field"><label class="eyebrow" for="gc">Money</label>
       <select id="gc" name="currency">${CURRENCIES.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select>
       <span class="hint">One currency per group. Traveling somewhere new? Start a new group.</span></div>
+    ${lookPicker()}
     <div class="err" id="cErr" role="alert"></div>
     <button class="btn primary full" type="submit">Create group</button>
   </form>`;
@@ -415,12 +477,7 @@ function viewPasscode(gid, g){
 }
 
 /* ---------- group ---------- */
-function headerLine(g){
-  const b = balances(g), mine = (b[g.me] || { net: 0 }).net;
-  const n = g.people.filter(isActive).length;
-  const st = mine > 0 ? `You're owed <b class="num pos">${fmt(mine, g.meta.currency)}</b>` : mine < 0 ? `You owe <b class="num neg">${fmt(-mine, g.meta.currency)}</b>` : "You're settled up";
-  return `${n} ${n === 1 ? "person" : "people"} · ${fmt(totalSpent(g), g.meta.currency)} spent · ${st}`;
-}
+
 function rxChip(e){
   const ids = e.receipts || [];
   if (!ids.length) return "";
@@ -430,50 +487,38 @@ function rxChip(e){
   if (days <= 0) return `<span class="chip gone">${label} deleted after 30 days</span>`;
   return `<span class="chip" role="button" tabindex="0" data-act="viewRx" data-id="${esc(e.id)}">${label} · deletes in ${days} day${days === 1 ? "" : "s"}</span>`;
 }
-function entryRow(g, e, pf){
-  let mine = "";
-  if (pf){ const delta = (e.paidBy === pf ? e.amount : 0) - ((e.split || {})[pf] || 0);
-    if (delta) mine = `<span class="num tiny ${delta > 0 ? "pos" : "neg"}" style="font-weight:600">${esc(pName(g, pf))} ${fmt(delta, g.meta.currency, true)}</span>`; }
-  const d = new Date((e.date || today()) + "T12:00:00");
-  const cur = g.meta.currency;
-  const sub = e.type === "payment"
-    ? (e.note ? esc(e.note) : "Paid back")
-    : `${esc(pName(g, e.paidBy))} paid · split ${e.mode === "exact" ? "by amounts" : e.mode === "percent" ? "by percent" : "equally"} · ${esc(e.category || "Other")}`;
-  const title = e.type === "payment"
-    ? `<span class="tag">Payment</span>${esc(pName(g, e.paidBy))} paid ${esc(pName(g, Object.keys(e.split || {})[0]))}`
-    : esc(e.desc || "Untitled");
-  const fresh = S.fresh && S.fresh.has(e.id) ? " fresh" : "";
-  return `<div class="entry${fresh}" role="button" tabindex="0" data-act="openEntry" data-id="${esc(e.id)}">
-    <div class="day"><b>${d.getDate()}</b><br><span>${esc(d.toLocaleDateString(undefined, { weekday: "short" }))}</span></div>
-    <div class="grow"><span class="title">${title}</span><span class="tiny muted">${sub}</span>${e.note && e.type !== "payment" ? `<span class="tiny muted">${esc(e.note)}</span>` : ""}${rxChip(e)}</div>
-    <div class="stack" style="gap:2px;align-items:flex-end"><span class="amt">${fmt(e.amount, cur)}</span>${mine}</div></div>`;
+function dateRange(g){
+  const ds = g.entries.filter(e => e.type !== "payment" && e.date).map(e => e.date).sort();
+  if (!ds.length) return "";
+  const a = new Date(ds[0] + "T12:00:00"), z = new Date(ds[ds.length - 1] + "T12:00:00");
+  const md = d => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (ds[0] === ds[ds.length - 1]) return md(a);
+  if (a.getFullYear() !== z.getFullYear()) return `${a.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} to ${z.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+  if (a.getMonth() === z.getMonth()) return `${md(a)} to ${z.getDate()}`;
+  return `${md(a)} to ${md(z)}`;
 }
-function ledgerHtml(g, f = {}){
-  if (!g.entries.length) return `<section class="card pad stack center" style="align-items:center">
-    <img class="illus" style="max-width:220px" src="/assets/empty.webp" width="640" height="592" alt="">
-    <h2>No expenses yet</h2><p class="small muted">Log the first one: who paid, how much, and who it was for.</p></section>`;
-  const q = (f.q || "").trim().toLowerCase(), pf = f.pf && f.pf !== "all" ? f.pf : "";
-  const list = g.entries.filter(e => !pf || e.paidBy === pf || (e.split && pf in e.split))
-    .filter(e => !q || [e.desc, e.note, e.category].some(x => (x || "").toLowerCase().includes(q)))
-    .sort((a, z) => (z.date || "").localeCompare(a.date || "") || (z.createdAt || 0) - (a.createdAt || 0));
-  if (!list.length) return `<section class="card pad center"><p class="muted" style="margin:0">Nothing matches that${q ? " search" : " filter"}.</p></section>`;
-  const months = new Map();
-  for (const e of list){ const k = (e.date || "").slice(0, 7); if (!months.has(k)) months.set(k, []); months.get(k).push(e); }
-  let html = "";
-  for (const [k, es] of months){
-    const [y, m] = k.split("-").map(Number);
-    const label = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
-    const tot = es.filter(e => e.type !== "payment").reduce((s, e) => s + e.amount, 0);
-    html += `<section class="card ledger"><div class="month-head"><b style="font-size:15px">${esc(label)}</b><span class="num small muted">${fmt(tot, g.meta.currency)}</span></div>${es.map(e => entryRow(g, e, pf)).join("")}</section>`;
-  }
-  return html;
+function headerLine(g){
+  const n = g.people.filter(isActive).length;
+  const r = dateRange(g);
+  return `${n} ${n === 1 ? "person" : "people"}${r ? " · " + esc(r) : ""} · ${fmt(totalSpent(g), g.meta.currency)} spent`;
+}
+function heroCard(g){
+  const v = balances(g)[g.me] || { net: 0, paid: 0, share: 0 }, cur = g.meta.currency;
+  const lbl = v.net > 0 ? "You're owed" : v.net < 0 ? "You owe" : "You're settled up";
+  return `<section class="hero" aria-label="Your balance">
+    <div class="lbl">${lbl}</div>
+    <div class="big">${fmt(Math.abs(v.net), cur)}</div>
+    <div class="tear"></div>
+    <div class="sub"><span>You paid <b>${fmt(v.paid, cur)}</b></span><span>Your share <b>${fmt(v.share, cur)}</b></span></div>
+  </section>`;
 }
 function viewGroup(g){
   const few = g.people.filter(isActive).length < 2;
-  const n = g.people.filter(isActive).length;
-  return `<div class="topbar">${backLink("All groups", "home")}<button type="button" class="btn" data-act="invite">Invite</button></div>
-  <div class="stack" style="gap:4px"><h1 style="font-size:30px;overflow-wrap:anywhere">${esc(g.meta.name)}</h1><span class="small muted">${headerLine(g)}</span></div>
+  const others = g.people.filter(p => joined(p) && p.id !== g.me).slice(0, 4);
+  return `<div class="topbar">${backLink("All groups", "home")}<button type="button" class="btn" data-act="invite">${faces(others, "xs")}Invite</button></div>
+  <div class="row" style="gap:12px">${groupEmo(g.meta)}<div class="stack" style="gap:2px;min-width:0"><h1 style="font-size:28px;overflow-wrap:anywhere">${esc(g.meta.name)}</h1><span class="small muted">${headerLine(g)}</span></div></div>
   ${few ? `<div class="banner">You're the only one here so far. Tap Invite to send your friends the link.</div>` : ""}
+  ${heroCard(g)}
   <div class="grid2">
     <button type="button" class="btn lg" data-nav="/g/${g.meta.id}/pay" ${few ? "disabled" : ""}>Record a payment</button>
     <button type="button" class="btn primary lg" data-nav="/g/${g.meta.id}/expense">Add expense</button>
@@ -487,6 +532,7 @@ function viewGroup(g){
     <a href="/g/${g.meta.id}/settings" data-nav="/g/${g.meta.id}/settings">Group settings<span class="side">${g.isCreator ? "Name, passcode, delete" : "Name, members, leave"}</span></a>
   </section>`;
 }
+
 function balanceCard(g){
   const b = balances(g), cur = g.meta.currency;
   const rows = Object.entries(b).filter(([id, v]) => isActive(pOf(g, id)) || v.net).sort((a, z) => z[1].net - a[1].net);
@@ -505,14 +551,64 @@ function balanceCard(g){
 }
 function settleCard(g){
   const plan = settlePlan(balances(g)), cur = g.meta.currency;
-  return `<section class="card pad stack">
+  const u = S.ui.undo && S.ui.undo.g === g.meta.id && g.entries.some(e => e.id === S.ui.undo.id) ? S.ui.undo : null;
+  const undoRow = u ? `<div class="undo" role="status"><span class="ok">${ICON.check}</span>
+      <div class="who"><b>${u.from === g.me ? "You" : esc(pName(g, u.from))}</b> paid <b>${esc(youOr(g, u.to))}</b> <span class="num">${fmt(u.c, cur)}</span><div class="tiny">Marked paid ${esc(ago(u.t))}</div></div>
+      <button type="button" class="btn sm" data-act="undoSettle">${ICON.undo}Undo</button></div>` : "";
+  return `<section class="card pad stack" style="gap:6px">
     <div class="between"><h2>Settle up</h2><span class="eyebrow">Fewest payments</span></div>
     ${g.people.filter(isActive).length < 2 ? `<p class="empty-note">Invite someone to start splitting.</p>`
       : !plan.length ? `<div class="pos" style="font-weight:600">✓ Everyone is square</div>`
-      : `<div class="stack tight">${plan.map((s, i) => `<div class="sunkrow" style="justify-content:space-between;flex-wrap:wrap">
-          <div style="min-width:0"><b>${esc(pName(g, s.from))}</b> pays <b>${esc(pName(g, s.to))}</b><div class="num" style="font-size:17px;font-weight:600">${fmt(s.c, cur)}</div></div>
+      : `<div>${plan.map((s, i) => `<div class="srow">${faces([pOf(g, s.from), pOf(g, s.to)])}
+          <div class="who"><b>${esc(pName(g, s.from))}</b> pays <b>${esc(pName(g, s.to))}</b></div>
+          <span class="amt">${fmt(s.c, cur)}</span>
           <button type="button" class="btn sm" data-act="settle" data-i="${i}">Mark paid</button></div>`).join("")}</div>`}
+    ${undoRow}
   </section>`;
+}
+function entryRow(g, e, pf, emojis, last){
+  const who = pf || g.me;
+  const delta = (e.paidBy === who ? e.amount : 0) - ((e.split || {})[who] || 0);
+  const involved = e.paidBy === who || (e.split && who in e.split);
+  const cur = g.meta.currency;
+  const pay = e.type === "payment";
+  const title = pay ? `${esc(pName(g, e.paidBy))} paid ${esc(pName(g, Object.keys(e.split || {})[0]))}` : esc(e.desc || "Untitled");
+  const sub = pay ? (e.note ? esc(e.note) : "Paid back") : `${esc(pName(g, e.paidBy))} paid · ${esc(e.category || "Other")}`;
+  const clip = (e.receipts || []).length ? ` <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6b5c" stroke-width="2" role="img" aria-label="has a photo" style="vertical-align:-1px"><path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg>` : "";
+  const fresh = S.fresh && S.fresh.has(e.id) ? " fresh" : "";
+  return `<div class="xrow${fresh}${last ? " last" : ""}" role="button" tabindex="0" data-act="openEntry" data-id="${esc(e.id)}">
+    ${catIcon(g, pay ? "Payment" : e.category, 38, pOf(g, e.paidBy), emojis)}
+    <div class="grow"><span class="title">${title}${clip}</span><span class="tiny muted">${sub}</span>${e.note && !pay ? `<span class="tiny muted" style="overflow-wrap:anywhere">${esc(e.note)}</span>` : ""}</div>
+    <div class="right"><span class="amt">${fmt(e.amount, cur)}</span>${involved && delta ? `<span class="num tiny ${delta > 0 ? "pos" : "neg"}">${fmt(delta, cur, true)}</span>` : ""}</div></div>`;
+}
+function dayLabel(d){
+  const t = today(), dt = new Date(d + "T12:00:00");
+  const y = new Date(t + "T12:00:00"); y.setDate(y.getDate() - 1);
+  const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+  const opts = { weekday: "short", month: "short", day: "numeric" };
+  if (dt.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+  const base = dt.toLocaleDateString(undefined, opts);
+  return d === t ? `Today · ${base}` : d === yk ? `Yesterday · ${base}` : base;
+}
+function ledgerHtml(g, f = {}){
+  if (!g.entries.length) return `<section class="card pad stack center" style="align-items:center">
+    <img class="illus" style="max-width:220px" src="/assets/empty.webp" width="640" height="592" alt="">
+    <h2>No expenses yet</h2><p class="small muted">Log the first one: who paid, how much, and who it was for.</p></section>`;
+  const q = (f.q || "").trim().toLowerCase(), pf = f.pf && f.pf !== "all" ? f.pf : "", cf = (f.cf || "").toLowerCase();
+  const list = g.entries.filter(e => !pf || e.paidBy === pf || (e.split && pf in e.split))
+    .filter(e => !cf || (e.type !== "payment" && (e.category || "Other").toLowerCase() === cf))
+    .filter(e => !q || [e.desc, e.note, e.category].some(x => (x || "").toLowerCase().includes(q)))
+    .sort((a, z) => (z.date || "").localeCompare(a.date || "") || (z.createdAt || 0) - (a.createdAt || 0));
+  if (!list.length) return `<section class="card pad center"><p class="muted" style="margin:0">Nothing matches that${q ? " search" : " filter"}.</p></section>`;
+  const days = new Map();
+  for (const e of list){ const k = e.date || ""; if (!days.has(k)) days.set(k, []); days.get(k).push(e); }
+  const emojis = catEmojis(g);
+  let html = "";
+  for (const [k, es] of days){
+    const tot = es.filter(e => e.type !== "payment").reduce((s, e) => s + e.amount, 0);
+    html += `<div class="dayhead"><span class="eyebrow">${esc(dayLabel(k))}</span>${tot ? `<span class="num tiny muted">${fmt(tot, g.meta.currency)}</span>` : ""}</div>${es.map((e, i) => entryRow(g, e, pf, emojis, i === es.length - 1)).join("")}`;
+  }
+  return `<section class="card xlist">${html}</section>`;
 }
 function viewExpenses(g){
   return `${groupBack(g)}
@@ -520,8 +616,9 @@ function viewExpenses(g){
   ${g.entries.length ? `<div class="stack tight">
     <input type="search" id="exQ" placeholder="Search descriptions or notes" aria-label="Search expenses" value="${esc(S.ui.q || "")}">
     ${filterChips(g)}
+    ${catChips(g)}
   </div>` : ""}
-  <div id="exList">${ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf })}</div>`;
+  <div id="exList">${ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf, cf: S.ui.cf })}</div>`;
 }
 function filterChips(g){
   const used = new Set(g.entries.flatMap(e => [e.paidBy, ...Object.keys(e.split || {})]));
@@ -529,8 +626,19 @@ function filterChips(g){
   if (ppl.length < 2) return "";
   const pf = S.ui.pf || "all";
   return `<div class="chips" role="group" aria-label="Filter by person">${[{ id: "all", name: "Everyone" }, ...ppl].map(p =>
-    `<button type="button" data-act="pf" data-id="${esc(p.id)}" aria-pressed="${pf === p.id}">${esc(p.name)}${p.id === g.me ? " (you)" : ""}</button>`).join("")}</div>`;
+    `<button type="button" data-act="pf" data-id="${esc(p.id)}" aria-pressed="${pf === p.id}">${p.id === "all" ? "" : dot(p, "xs")}${esc(p.name)}${p.id === g.me ? " (you)" : ""}</button>`).join("")}</div>`;
 }
+function catChips(g){
+  const n = {};
+  for (const e of g.entries) if (e.type !== "payment"){ const c = e.category || "Other"; const k = c.toLowerCase(); n[k] = n[k] || { c, k: 0 }; n[k].k++; }
+  const cats = Object.values(n).sort((a, z) => z.k - a.k || a.c.localeCompare(z.c));
+  if (cats.length < 2) return "";
+  const emojis = catEmojis(g), cf = (S.ui.cf || "").toLowerCase();
+  return `<div class="catchips" role="group" aria-label="Filter by category">${cats.map(({ c }) => {
+    const k = c.toLowerCase(); const col = emojis[k] ? "#6b5b3e" : (CAT_ICONS[k] || CAT_ICONS.custom)[0];
+    return `<button type="button" data-act="cf" data-c="${esc(c)}" aria-pressed="${cf === k}" style="background:${col}1f">${catIcon(g, c, 24, null, emojis)}${esc(c)}</button>`; }).join("")}</div>`;
+}
+
 const groupBack = g => backLink(g.meta.name, "nav", `data-to="/g/${g.meta.id}"`);
 
 function viewStanding(g){
@@ -685,6 +793,49 @@ function viewLeave(g){
   </div>`;
 }
 
+/* ---------- one expense, shown as a receipt ---------- */
+function viewItem(g, id){
+  const e = g.entries.find(x => x.id === id && x.type !== "payment");
+  const back = backLink("Expenses", "nav", `data-to="/g/${g.meta.id}/expenses"`);
+  if (!e) return `${back}<div class="card pad">That expense isn't here any more. It may have been deleted.</div>`;
+  const cur = g.meta.currency;
+  const d = new Date((e.date || today()) + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const how = e.mode === "exact" ? "split by amounts" : e.mode === "percent" ? "split by percent" : "split equally";
+  const ids = Object.keys(e.split || {});
+  const order = [...ids].sort((a, z) => (a === e.paidBy ? -1 : z === e.paidBy ? 1 : 0));
+  const shareRows = order.map(pid => `<div class="prow">${dot(pOf(g, pid), "sm")}<span class="n">${esc(pName(g, pid))}${pid === g.me ? " (you)" : ""}${pid === e.paidBy ? ` <span class="tiny muted">· paid ${fmt(e.amount, cur)}</span>` : ""}</span><span class="v">${fmt(e.split[pid], cur)}</span></div>`).join("")
+    + (ids.includes(e.paidBy) ? "" : `<div class="prow">${dot(pOf(g, e.paidBy), "sm")}<span class="n">${esc(pName(g, e.paidBy))}${e.paidBy === g.me ? " (you)" : ""} <span class="tiny muted">· paid ${fmt(e.amount, cur)}</span></span><span class="v muted">not in this one</span></div>`);
+  const rx = e.receipts || [];
+  let rxHtml = "";
+  if (rx.length){
+    const until = Math.min(...rx.map(x => (e.rxExp && e.rxExp[x]) || Date.now()));
+    const gone = until <= Date.now();
+    rxHtml = `<div class="tear">${gone ? `<span class="small muted">${rx.length === 1 ? "Receipt photo" : rx.length + " photos"} deleted after 30 days</span>`
+      : `<button type="button" class="rxthumb" data-act="viewRx" data-id="${esc(e.id)}"><span class="ph"><img data-rx="${esc(rx[0])}" alt=""></span>
+        <span class="stack" style="gap:0"><b style="font-size:14px">${rx.length === 1 ? "Receipt photo" : rx.length + " photos"}</b><span class="tiny muted">Deletes on ${esc(shortDate(until))}</span></span></button>`}</div>`;
+  }
+  const by = `Added by ${esc(pName(g, e.addedBy))}${e.createdAt ? " " + esc(ago(e.createdAt)) : ""}${e.editedAt ? ` · edited by ${esc(pName(g, e.editedBy))}, ${esc(ago(e.editedAt))}` : ""}`;
+  return `${back}
+  <div class="paper">
+    <div class="head">${catIcon(g, e.category, 52)}
+      <div class="ttl">${esc(e.desc || "Untitled")}</div>
+      <div class="small muted">${esc(d)} · ${esc(e.category || "Other")} · ${how}</div>
+      <div class="amt">${fmt(e.amount, cur)}</div></div>
+    <div class="tear"><div class="eyebrow" style="margin-bottom:4px">Each person's share</div>${shareRows}</div>
+    ${e.note ? `<div class="tear"><div class="eyebrow" style="margin-bottom:4px">Note</div><p style="font-size:14px;overflow-wrap:anywhere">${esc(e.note)}</p></div>` : ""}
+    ${rxHtml}
+    <p class="tiny muted center" style="margin-top:16px">${by}</p>
+  </div>
+  <div class="err" id="itErr" role="alert"></div>
+  <div class="grid2">
+    <button type="button" class="btn lg" data-nav="/g/${g.meta.id}/expense/${esc(e.id)}">Edit</button>
+    <button type="button" class="btn danger lg" data-act="delItem" data-id="${esc(e.id)}">Delete</button>
+  </div>`;
+}
+function bindItem(g){
+  V.querySelectorAll("img[data-rx]").forEach(img => getRx(g.meta.id, img.dataset.rx).then(u => { img.src = u; }).catch(() => {}));
+}
+
 /* ---------- expense form ---------- */
 let ED = null;
 function choosable(g, e){
@@ -701,43 +852,51 @@ function viewExpense(g, id){
   const cat = e ? e.category || "Other" : "Dining";
   if (e && !cats.includes(cat)) cats.splice(cats.length - 1, 0, cat);
   const payer = e ? e.paidBy : g.me;
-  return `${groupBack(g)}
-  <h1>${e ? "Edit expense" : "Add expense"}</h1>
+  const emojis = catEmojis(g);
+  return `<div class="topbar"><button type="button" class="back" data-act="back">Cancel</button><h1 style="font-size:17px;font-family:var(--body);font-weight:600">${e ? "Edit expense" : "New expense"}</h1><span style="width:52px" aria-hidden="true"></span></div>
   <form class="stack" id="fx" novalidate style="gap:14px">
-    <div class="field"><label class="eyebrow" for="fxDesc">What was it for</label><input id="fxDesc" type="text" maxlength="80" value="${esc(e ? e.desc : "")}" placeholder="Dinner, groceries, gas" ${e ? "" : "autofocus"}></div>
+  <div class="paper stack" style="gap:14px">
+    <div class="field"><span class="eyebrow">Category · <span id="fxCatName" style="color:var(--ink)">${esc(cat)}</span></span>
+      <input type="hidden" id="fxCat" value="${esc(cat)}">
+      <div class="cattiles" id="fxCats" role="group" aria-label="Category">${cats.map(c => `<button type="button" data-cat="${esc(c)}" aria-pressed="${c === cat}" aria-label="${esc(c)}" title="${esc(c)}">${catIcon(g, c, 40, null, emojis)}</button>`).join("")}<button type="button" class="add" data-cat="__new__" aria-pressed="false" aria-label="New category" title="New category">+</button></div>
+      <div class="grid2" id="fxCatNewWrap" hidden style="grid-template-columns:minmax(0,1fr) 110px;margin-top:4px">
+        <div class="field"><label class="eyebrow" for="fxCatNew">New category</label><input id="fxCatNew" class="ln" type="text" maxlength="24" placeholder="e.g. Parking"></div>
+        <div class="field"><label class="eyebrow" for="fxCatEmoji">Emoji</label><input id="fxCatEmoji" class="ln" type="text" maxlength="16" placeholder="Optional" autocomplete="off"></div>
+      </div></div>
+    <div class="field"><label class="eyebrow" for="fxDesc">What was it for?</label><input id="fxDesc" class="ln big" type="text" maxlength="80" value="${esc(e ? e.desc : "")}" placeholder="Dinner, groceries, gas" ${e ? "" : "autofocus"}></div>
+    <div class="field center"><label class="eyebrow" for="fxAmt">Amount</label>
+      <div class="bigamt"><span class="cur">${esc(curSymbol(g.meta.currency))}</span><input id="fxAmt" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="${e ? (e.amount / 100).toFixed(2) : ""}"></div></div>
     <div class="grid2">
-      <div class="field"><label class="eyebrow" for="fxAmt">Amount</label><div class="amt-in"><span class="cur">${esc(curSymbol(g.meta.currency))}</span><input id="fxAmt" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="${e ? (e.amount / 100).toFixed(2) : ""}"></div></div>
-      <div class="field"><label class="eyebrow" for="fxDate">Date</label><input id="fxDate" type="date" value="${esc(e ? e.date : today())}"></div>
+      <div class="field"><label class="eyebrow" for="fxDate">Date</label><input id="fxDate" class="ln" type="date" value="${esc(e ? e.date : today())}"></div>
+      <div class="field"><label class="eyebrow" for="fxPayer">Paid by</label><div class="payer-sel"><span id="fxPayerDot">${dot(pOf(g, payer), "sm")}</span><select id="fxPayer">${ppl.map(p => `<option value="${esc(p.id)}" ${p.id === payer ? "selected" : ""}>${esc(p.name)}${p.id === g.me ? " (you)" : ""}${p.leftAt ? " (former)" : ""}</option>`).join("")}</select></div></div>
     </div>
-    <div class="grid2">
-      <div class="field"><label class="eyebrow" for="fxPayer">Paid by</label><select id="fxPayer">${ppl.map(p => `<option value="${esc(p.id)}" ${p.id === payer ? "selected" : ""}>${esc(p.name)}${p.id === g.me ? " (you)" : ""}${p.leftAt ? " (former)" : ""}</option>`).join("")}</select></div>
-      <div class="field"><label class="eyebrow" for="fxCat">Category</label><select id="fxCat">${cats.map(c => `<option ${c === cat ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new__">+ New category…</option></select>
-        <input id="fxCatNew" type="text" maxlength="24" placeholder="Name it, e.g. Gas" aria-label="New category name" hidden></div>
-    </div>
-    <div class="field"><span class="eyebrow">Split</span>
+    <div class="tear field" style="margin-top:0"><span class="eyebrow">Split</span>
       <div class="seg" id="fxMode" role="group" aria-label="Split method">
-        <button type="button" data-m="equal">Equally</button><button type="button" data-m="exact">Exact</button><button type="button" data-m="percent">Percent</button>
+        <button type="button" data-m="equal">Equally</button><button type="button" data-m="exact">By amounts</button><button type="button" data-m="percent">By percent</button>
       </div>
       <div class="parts" id="fxParts">${ppl.map(p => {
         const inc = e ? (p.id in (e.split || {})) : isActive(p);
         let v = "";
         if (e && inc) v = e.mode === "exact" ? (e.split[p.id] / 100).toFixed(2) : e.mode === "percent" ? (e.pct && e.pct[p.id] !== undefined ? e.pct[p.id] : +(e.split[p.id] / e.amount * 100).toFixed(2)) : "";
-        return `<div class="part" data-id="${esc(p.id)}"><label>${dot(p, "sm")}<input type="checkbox" ${inc ? "checked" : ""} ${p.leftAt && !inc ? "disabled" : ""} aria-label="Include ${esc(p.name)}"><span class="n">${esc(p.name)}</span></label>
+        return `<div class="part" data-id="${esc(p.id)}"><label><input type="checkbox" ${inc ? "checked" : ""} ${p.leftAt && !inc ? "disabled" : ""} aria-label="Include ${esc(p.name)}">${dot(p, "sm")}<span class="n">${esc(p.name)}${p.id === g.me ? " (you)" : ""}</span></label>
           <span class="share"></span><input type="number" step="0.01" min="0" inputmode="decimal" value="${esc(v)}" aria-label="${esc(p.name)}'s share" hidden></div>`; }).join("")}</div>
-      <div class="splitcheck" id="fxCheck"></div>
+      <div class="splitfoot"><span id="fxCount"></span><span id="fxCheck" role="status"></span></div>
     </div>
-    <div class="field"><label class="eyebrow" for="fxNote">Note (optional)</label><input id="fxNote" type="text" maxlength="140" value="${esc(e ? e.note : "")}" placeholder="Anything the group should know"></div>
-    <div class="field"><span class="eyebrow">Receipt photo (optional)</span>
+    <div class="tear field" style="margin-top:0;gap:10px">
       <div class="rx-row" id="fxRx"></div>
       <input type="file" id="fxFiles" accept="image/*" multiple hidden>
-      <button type="button" class="btn" id="fxAddRx" style="align-self:flex-start">${ICON.camera}Add receipt or photo</button>
-      <span class="tiny muted" id="fxRxHint">Photos delete themselves after 30 days.</span></div>
-    ${e ? `<p class="tiny muted">Logged by ${esc(pName(g, e.addedBy))}${e.createdAt ? " on " + esc(shortDate(e.createdAt)) : ""}${e.editedAt ? ` · last edited by ${esc(pName(g, e.editedBy))} ${esc(shortDate(e.editedAt))}` : ""}</p>` : ""}
+      <button type="button" class="dashbtn" id="fxAddRx">${ICON.camera}Add receipt photo</button>
+      <span class="tiny muted" id="fxRxHint">Photos delete themselves after 30 days.</span>
+      <div class="field"><label class="eyebrow" for="fxNote">Note (optional)</label><input id="fxNote" class="ln" type="text" maxlength="140" value="${esc(e ? e.note : "")}" placeholder="Anything the group should know"></div>
+    </div>
+    ${e ? `<p class="tiny muted center">Logged by ${esc(pName(g, e.addedBy))}${e.createdAt ? " on " + esc(shortDate(e.createdAt)) : ""}${e.editedAt ? ` · last edited by ${esc(pName(g, e.editedBy))} ${esc(shortDate(e.editedAt))}` : ""}</p>` : ""}
+  </div>
     <div class="err" id="fxErr" role="alert"></div>
-    <button type="submit" class="btn primary full" id="fxSave">${e ? "Save changes" : "Save expense"}</button>
+    <button type="submit" class="btn dark full" id="fxSave">${e ? "Save changes" : "Save expense"}</button>
     ${e ? `<button type="button" class="btn danger lg full" id="fxDel">Delete</button>` : ""}
   </form>`;
 }
+
 function bindExpense(g, id){
   const e = id ? g.entries.find(x => x.id === id && x.type !== "payment") : null;
   if (id && !e) return;
@@ -775,15 +934,25 @@ function bindExpense(g, id){
   };
   const update = () => {
     const r = compute();
-    r.rows.forEach(x => { x.row.querySelector(".share").textContent = x.on ? fmt(r.split[x.id] || 0, cur) : "–"; x.row.querySelector("input[type=number]").disabled = !x.on; });
-    const c = $("#fxCheck"); c.textContent = r.total ? r.msg : "Enter an amount to see the split"; c.className = "splitcheck " + (r.total ? (r.ok ? "ok" : "bad") : "");
+    r.rows.forEach(x => { x.row.querySelector(".share").textContent = x.on ? fmt(r.split[x.id] || 0, cur) : "not in this one"; x.row.classList.toggle("off", !x.on); x.row.querySelector("input[type=number]").disabled = !x.on; });
+    const n = r.rows.filter(x => x.on).length;
+    $("#fxCount").textContent = `${n} ${n === 1 ? "person" : "people"}`;
+    const c = $("#fxCheck"); c.textContent = r.total ? (r.ok ? (ED.mode === "equal" ? `Adds up to ${fmt(r.total, cur)} ✓` : r.msg + " ✓") : r.msg) : "Enter an amount to see the split"; c.className = r.total ? (r.ok ? "ok" : "bad") : "";
     return r;
   };
   ED.compute = compute;
   $("#fxMode").addEventListener("click", ev => { const b = ev.target.closest("button[data-m]"); if (b) setMode(b.dataset.m); });
   $("#fxAmt").addEventListener("input", update);
   $("#fxParts").addEventListener("input", update);
-  $("#fxCat").addEventListener("change", () => { const n = $("#fxCat").value === "__new__"; $("#fxCatNew").hidden = !n; if (n) $("#fxCatNew").focus(); });
+  $("#fxCats").addEventListener("click", ev => {
+    const b = ev.target.closest("button[data-cat]"); if (!b) return;
+    const c = b.dataset.cat, isNew = c === "__new__";
+    $("#fxCat").value = c;
+    $("#fxCats").querySelectorAll("button[data-cat]").forEach(x => x.setAttribute("aria-pressed", x === b));
+    $("#fxCatName").textContent = isNew ? "New" : c;
+    $("#fxCatNewWrap").hidden = !isNew; if (isNew) $("#fxCatNew").focus();
+  });
+  $("#fxPayer").addEventListener("change", () => { $("#fxPayerDot").innerHTML = dot(pOf(g, $("#fxPayer").value), "sm"); });
   $("#fxAddRx").onclick = () => $("#fxFiles").click();
   $("#fxFiles").addEventListener("change", async ev => {
     const files = [...ev.target.files].slice(0, MAX_RX - ED.rx.length); ev.target.value = "";
@@ -845,12 +1014,18 @@ async function saveExpense(g){
   const isNew = $("#fxCat").value === "__new__";
   const category = isNew ? $("#fxCatNew").value.trim().replace(/\s+/g, " ") : $("#fxCat").value;
   if (!category){ err.textContent = "Type a name for the new category."; $("#fxCatNew").focus(); return; }
+  const rawEmo = isNew ? $("#fxCatEmoji").value.trim() : "";
+  const newEmo = firstEmoji(rawEmo);
+  if (rawEmo && !newEmo){ err.textContent = "That isn't an emoji. Pick one from your keyboard's emoji list, or leave it empty."; $("#fxCatEmoji").focus(); return; }
+  const known = catEmojis(g)[category.toLowerCase()];
+  const catEmoji = newEmo || (BUILT_IN.some(b => b.toLowerCase() === category.toLowerCase()) ? "" : known || "");
   if (ED.rx.some(x => x.busy)){ err.textContent = "Wait a moment, a photo is still being prepared."; return; }
   const btn = $("#fxSave"); btn.disabled = true;
   try {
     for (const x of ED.rx){ if (x.data && !x.up){ await api("POST", "/api/receipt", { g: g.meta.id, id: x.id, data: x.data }); x.up = true; rxCache.set(x.id, x.data); } }
     const entry = { id: ED.e ? ED.e.id : uid(), type: "expense", desc, amount: r.total, date: $("#fxDate").value || today(), category,
       receipts: ED.rx.map(x => x.id), paidBy: $("#fxPayer").value, mode: ED.mode, split: r.split, note: $("#fxNote").value.trim() };
+    if (catEmoji) entry.catEmoji = catEmoji;
     if (ED.mode === "percent") entry.pct = r.pct;
     await api("POST", "/api/group", { op: "putEntry", g: g.meta.id, entry });
     await loadGroup(g.meta.id);
@@ -987,7 +1162,14 @@ const ACT = {
   pick: el => { S.ui.claim = el.dataset.id; S.ui.pc = V.querySelector("#jp").value; render(); },
   invite: () => { const g = G(); copyText(`Join "${g.meta.name}" on Contri so we can split costs: ${inviteLink(g.meta.id)}\nI'll send you the passcode separately.`, "Invite copied"); },
   copyNewInvite: () => { const d = S.ui.created; copyText(`Join "${d.name}" on Contri so we can split costs: ${inviteLink(d.g)}\nPasscode: ${d.passcode}`, "Invite copied"); },
-  openEntry: el => { const g = G(); const e = g.entries.find(x => x.id === el.dataset.id); if (e) go(`/g/${g.meta.id}/${e.type === "payment" ? "pay" : "expense"}/${e.id}`); },
+  openEntry: el => { const g = G(); const e = g.entries.find(x => x.id === el.dataset.id); if (e) go(`/g/${g.meta.id}/${e.type === "payment" ? "pay" : "item"}/${e.id}`); },
+  delItem: async el => {
+    const g = G();
+    if (!el.dataset.arm){ el.dataset.arm = "1"; el.textContent = "Tap again to delete"; return; }
+    el.disabled = true;
+    try { await api("POST", "/api/group", { op: "delEntry", g: g.meta.id, id: el.dataset.id }); await loadGroup(g.meta.id); toast("Moved to Recently deleted"); go(`/g/${g.meta.id}/expenses`); }
+    catch (e){ el.disabled = false; handleErr(e, V.querySelector("#itErr")); }
+  },
   viewRx: async el => {
     const g = G(); const e = g.entries.find(x => x.id === el.dataset.id); if (!e) return;
     openDialog(`<div class="sheet viewer"><div class="between" style="align-items:center"><h2>${esc(e.desc)}</h2><button type="button" class="btn sm" data-close>Close</button></div>
@@ -995,10 +1177,34 @@ const ACT = {
     DLG.querySelectorAll("img").forEach(img => getRx(g.meta.id, img.dataset.id).then(u => { img.src = u; img.removeAttribute("width"); img.removeAttribute("height"); })
       .catch(err => img.replaceWith(Object.assign(document.createElement("p"), { className: "small muted", textContent: err.message }))));
   },
-  settle: el => { const g = G(); const s = settlePlan(balances(g))[+el.dataset.i]; if (s) go(`/g/${g.meta.id}/pay`, { from: s.from, to: s.to, c: s.c }); },
+  settle: async el => {
+    const g = G(); const s = settlePlan(balances(g))[+el.dataset.i]; if (!s) return;
+    el.disabled = true;
+    const entry = { id: uid(), type: "payment", amount: s.c, date: today(), paidBy: s.from, split: { [s.to]: s.c }, note: "" };
+    try {
+      await api("POST", "/api/group", { op: "putEntry", g: g.meta.id, entry });
+      await loadGroup(g.meta.id);
+      S.ui.undo = { g: g.meta.id, id: entry.id, from: s.from, to: s.to, c: s.c, t: Date.now() };
+      const y = window.scrollY; render(); window.scrollTo(0, y);
+    } catch (e){ el.disabled = false; handleErr(e); }
+  },
+  undoSettle: async el => {
+    const g = G(); const u = S.ui.undo; if (!u) return;
+    el.disabled = true;
+    try {
+      await api("POST", "/api/group", { op: "delEntry", g: g.meta.id, id: u.id });
+      await loadGroup(g.meta.id); S.ui.undo = null; toast("Undone");
+      const y = window.scrollY; render(); window.scrollTo(0, y);
+    } catch (e){ el.disabled = false; handleErr(e); }
+  },
+  cf: el => { const c = el.dataset.c; S.ui.cf = (S.ui.cf || "").toLowerCase() === c.toLowerCase() ? "" : c; const g = G();
+    V.querySelectorAll("[data-act=cf]").forEach(b => b.setAttribute("aria-pressed", (S.ui.cf || "").toLowerCase() === b.dataset.c.toLowerCase()));
+    V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf, cf: S.ui.cf }); },
+  quickEmo: el => { const e = el.dataset.e; const i = V.querySelector("#gEmoji"); i.value = e; V.querySelector("#emoShow").textContent = e; S.ui.emoji = e;
+    V.querySelectorAll("[data-act=quickEmo]").forEach(b => b.setAttribute("aria-pressed", b === el)); },
   pf: el => { S.ui.pf = el.dataset.id; const g = G();
     V.querySelectorAll("[data-act=pf]").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === S.ui.pf));
-    V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf }); },
+    V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf, cf: S.ui.cf }); },
   actF: el => { S.ui.actFilter = el.dataset.f; render(); },
   csv: () => { const g = G(); downloadCSV(g.entries, g.people, g.meta, "now"); },
   dlBackup: async el => {
@@ -1050,13 +1256,18 @@ V.addEventListener("click", ev => {
   const el = ev.target.closest("[data-act]");
   if (el && ACT[el.dataset.act] && !el.disabled){ if (el.tagName !== "INPUT") ev.preventDefault(); ACT[el.dataset.act](el, ev); }
 });
+V.addEventListener("focusin", ev => { if (ev.target.id === "gEmoji") ev.target.select(); });
 V.addEventListener("keydown", ev => {
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches("[role=button][data-act]")){ ev.preventDefault(); ev.target.click(); }
 });
 V.addEventListener("input", ev => {
-  if (ev.target.id === "exQ"){ S.ui.q = ev.target.value; const g = G(); if (g) V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf }); }
+  if (ev.target.id === "exQ"){ S.ui.q = ev.target.value; const g = G(); if (g) V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf, cf: S.ui.cf }); }
+  if (ev.target.id === "gEmoji"){ const e = firstEmoji(ev.target.value); if (e){ ev.target.value = e; S.ui.emoji = e; V.querySelector("#emoShow").textContent = e;
+    V.querySelectorAll("[data-act=quickEmo]").forEach(b => b.setAttribute("aria-pressed", b.dataset.e === e)); } }
 });
 V.addEventListener("change", ev => {
+  if (ev.target.name === "color" && V.querySelector("#emoTile")){ S.ui.color = ev.target.value; V.querySelector("#emoTile").style.background = ev.target.value + "26"; }
+  if (ev.target.id === "gEmoji"){ const e = firstEmoji(ev.target.value); ev.target.value = e || S.ui.emoji || QUICK_EMOJI[0]; V.querySelector("#emoShow").textContent = ev.target.value; }
   if (ev.target.id === "rcOk"){ V.querySelector("#rcDone").disabled = !ev.target.checked; }
   if (ev.target.id === "scur") setCurrency(ev.target);
   if (ev.target.id === "sn") renameGroup(ev.target);
@@ -1097,7 +1308,9 @@ const FORMS = {
     go(`/g/${m[1]}`, { fresh: true });
   },
   async create(f, err){
-    const d = await api("POST", "/api/group", { op: "create", name: f.name, passcode: f.passcode, currency: f.currency });
+    const emoji = firstEmoji(f.emoji);
+    if (String(f.emoji || "").trim() && !emoji){ err.textContent = "That isn't an emoji. Tap the tile and pick one from your keyboard's emoji list."; return; }
+    const d = await api("POST", "/api/group", { op: "create", name: f.name, passcode: f.passcode, currency: f.currency, emoji, color: f.color });
     S.home = null;
     S.ui.created = { g: d.g, name: f.name.trim().replace(/\s+/g, " "), passcode: f.passcode.trim() };
     render();

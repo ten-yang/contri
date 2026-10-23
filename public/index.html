@@ -217,12 +217,125 @@ dialog h2{font-size:22px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;z-index:30;max-width:calc(100vw - 32px);text-align:center}
 .banner{background:var(--sunk);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.entry.fresh{animation:fresh 1.2s ease both}@keyframes fresh{from{background:var(--tint)}to{background:transparent}}}
+
+/* ---- polish: shared pieces ---- */
+.dot.xs{width:18px;height:18px;font-size:9px;box-shadow:0 0 0 2px var(--surface)}
+.faces{display:inline-flex;align-items:center}
+.faces .dot{margin-left:-8px;box-shadow:0 0 0 2px var(--surface)}
+.faces .dot:first-child{margin-left:0}
+.gemo{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:28px;line-height:1;flex:none;font-weight:700;font-family:var(--display)}
+.hero{position:relative;background:var(--accent);color:#fff;border-radius:18px;padding:18px 20px;
+  -webkit-mask:radial-gradient(circle 11px at 0 50%,transparent 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 11px at 100% 50%,transparent 97%,#000) right/51% 100% no-repeat;
+  mask:radial-gradient(circle 11px at 0 50%,transparent 97%,#000) left/51% 100% no-repeat,radial-gradient(circle 11px at 100% 50%,transparent 97%,#000) right/51% 100% no-repeat}
+.hero .lbl{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;opacity:.8}
+.hero .big{font-family:var(--display);font-size:40px;line-height:1.1;margin-top:4px;font-weight:700}
+.hero .tear{border-top:2px dashed rgba(255,255,255,.3);margin:14px 0 10px}
+.hero .sub{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}
+.hero .sub span{opacity:.85}
+.hero .sub b{font-family:var(--mono);font-weight:600}
+.cic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;position:relative;line-height:1}
+.cic .payer{position:absolute;right:-5px;bottom:-5px}
+/* settle up with faces + undo */
+.srow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line2)}
+.srow:last-child{border-bottom:0}
+.srow .who{flex:1;min-width:0;font-size:14px;overflow-wrap:anywhere}
+.srow .amt{font-family:var(--mono);font-weight:600;font-size:14px;white-space:nowrap}
+.undo{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--pos-soft);color:#1f4d30;margin-top:4px}
+.undo .ok{width:26px;height:26px;border-radius:50%;background:var(--pos);color:#fff;display:grid;place-items:center;flex:none}
+.undo .who{flex:1;min-width:0;font-size:14px}
+.undo .btn{background:var(--pos);border-color:var(--pos);color:#fff}
+/* expenses list */
+.xlist{padding:0 14px}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:14px 0 4px}
+.dayhead .eyebrow{font-size:11px;letter-spacing:.09em}
+.xrow{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line2);cursor:pointer}
+.xrow.last{border-bottom:0}
+.xrow .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.xrow .title{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xrow .right{text-align:right;display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+.xrow .amt{font-family:var(--mono);font-weight:600;font-size:15px;white-space:nowrap}
+.chips button{display:inline-flex;align-items:center;gap:6px}
+.chips button .dot{margin-left:-4px}
+.catchips{display:flex;flex-wrap:wrap;gap:6px}
+.catchips button{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:0 10px 0 4px;border:1px solid transparent;border-radius:8px;font-weight:600;font-size:12px}
+.catchips button[aria-pressed=true]{border-color:currentColor;box-shadow:0 0 0 1px currentColor}
+.catchips .cic{width:24px;height:24px;border-radius:7px;background:transparent!important}
+@media (prefers-reduced-motion:no-preference){.xrow.fresh{animation:fresh 1.2s ease both}}
+/* receipt paper */
+.paper{position:relative;background:var(--surface);padding:12px 20px 18px;margin:10px 0;filter:drop-shadow(0 6px 14px rgba(38,48,42,.08))}
+.paper::before,.paper::after{content:"";position:absolute;left:0;right:0;height:10px;background-repeat:repeat-x;background-size:12px 10px}
+.paper::before{bottom:100%;background-image:linear-gradient(45deg,var(--surface) 4.5px,transparent 0),linear-gradient(-45deg,var(--surface) 4.5px,transparent 0);background-position:left bottom}
+.paper::after{top:100%;background-image:linear-gradient(135deg,var(--surface) 4.5px,transparent 0),linear-gradient(-135deg,var(--surface) 4.5px,transparent 0);background-position:left top}
+.paper .tear{border-top:2px dashed var(--line);margin:12px 0 0;padding-top:12px}
+.paper .head{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 0 2px;text-align:center}
+.paper .head .ttl{font-family:var(--display);font-weight:700;font-size:22px;overflow-wrap:anywhere}
+.paper .head .amt{font-family:var(--display);font-weight:700;font-size:40px;line-height:1.1;margin-top:4px}
+.prow{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:14px}
+.prow .n{flex:1;min-width:0;overflow-wrap:anywhere}
+.prow .v{font-family:var(--mono)}
+.rxthumb{display:flex;gap:10px;align-items:center;border:0;background:none;padding:0;text-align:left;width:100%}
+.rxthumb .ph{width:54px;height:54px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);overflow:hidden;flex:none}
+.rxthumb .ph img{width:100%;height:100%;object-fit:cover;display:block}
+/* receipt-style form */
+.paper .ln{height:auto;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:6px 0;box-shadow:none}
+.paper .ln:focus{border-bottom-color:var(--accent);box-shadow:0 1px 0 var(--accent)}
+.paper .ln.big{font-family:var(--display);font-weight:600;font-size:20px}
+.bigamt{display:flex;justify-content:center;align-items:baseline;gap:4px;margin-top:4px}
+.bigamt .cur{font-family:var(--display);font-size:28px;color:var(--muted)}
+.bigamt input::-webkit-outer-spin-button,.bigamt input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.bigamt input{-moz-appearance:textfield;appearance:textfield;border:0!important;background:transparent!important;box-shadow:none!important;font-family:var(--display)!important;font-weight:700;font-size:44px!important;height:auto!important;padding:0!important;width:200px!important;text-align:left}
+.cattiles{display:flex;gap:6px;flex-wrap:wrap}
+.cattiles button{border:0;padding:3px;border-radius:14px;background:transparent}
+.cattiles button[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)}
+.cattiles .add{width:46px;height:46px;border:1.5px dashed var(--border);border-radius:12px;color:var(--muted);font-size:20px;padding:0}
+.payer-sel{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:4px 0}
+.payer-sel select{border:0;background:transparent;height:auto;padding:4px 0;box-shadow:none!important}
+.paper .parts{gap:0}
+.paper .part{background:transparent;padding:4px 0;min-height:44px;border-radius:0}
+.paper .part.off .n,.paper .part.off .dot{opacity:.5}
+.paper .part .share{min-width:0;color:var(--ink)}
+.paper .part.off .share{color:var(--muted);font-family:var(--mono);font-size:13px}
+.splitfoot{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-top:4px}
+.splitfoot .ok{color:var(--pos);font-family:var(--mono)}
+.splitfoot .bad{color:var(--neg);font-family:var(--mono)}
+.dashbtn{min-height:56px;border:1.5px dashed var(--border);border-radius:12px;background:transparent;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;font-size:14px;color:var(--accent);width:100%}
+.btn.dark{background:var(--ink);border-color:var(--ink);color:#fff;min-height:52px;border-radius:12px;font-size:16px}
+/* home */
+.greet{font-family:var(--display);font-size:15px;color:var(--muted);font-weight:600}
+.hero .cline{display:flex;align-items:center;gap:10px;padding:6px 0}
+.hero .cline + .cline{border-top:2px dashed rgba(255,255,255,.25)}
+.hero .csym{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.14);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.hero .cline .l{flex:1;font-size:14px;opacity:.9}
+.hero .cline b{font-family:var(--mono);font-size:18px}
+.gcard{position:relative;overflow:hidden;display:flex;gap:12px;align-items:center;padding:14px 14px 14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;text-decoration:none;color:var(--ink)}
+.gcard:hover{border-color:var(--border);color:var(--ink)}
+.gcard .stripe{position:absolute;left:0;top:0;bottom:0;width:6px}
+.gcard .gemo{width:48px;height:48px;border-radius:14px;font-size:26px}
+.gcard .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.gcard .grow b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gcard .meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.gcard .right{text-align:right}
+.gcard .right .v{font-family:var(--mono);font-weight:600;font-size:15px}
+.gcard .right .t{font-size:11px;color:var(--muted)}
+/* create: pick a look */
+.look{display:flex;flex-direction:column;gap:12px}
+.emo-pick{position:relative;width:64px;height:64px;border-radius:18px;display:grid;place-items:center;font-size:34px;line-height:1;flex:none;box-shadow:inset 0 0 0 2px var(--ink);cursor:pointer}
+.emo-pick input{position:absolute;inset:0;opacity:0;width:100%;height:100%;font-size:16px;border:0;padding:0;cursor:pointer}
+.emo-pick:focus-within{outline:2px solid var(--accent);outline-offset:3px}
+.quick{display:flex;gap:8px;flex-wrap:wrap}
+.quick button{width:44px;height:44px;border:0;border-radius:12px;background:var(--sunk);font-size:22px;line-height:1;padding:0}
+.quick button[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)}
+.colors{display:flex;gap:10px;flex-wrap:wrap}
+.colors label{position:relative;width:32px;height:32px;border-radius:50%;cursor:pointer}
+.colors input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.colors label:has(input:checked){box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.colors label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:4px}
 </style>
 </head>
 <body>
 <div class="wave" id="wave" aria-hidden="true" hidden><svg viewBox="0 0 390 200" preserveAspectRatio="none"><path d="M0 92 C 70 40, 150 140, 245 86 S 360 52, 390 64 V200 H0Z" fill="#8a9a78" opacity=".16"/><path d="M0 132 C 90 96, 180 170, 280 124 S 370 108, 390 116 V200 H0Z" fill="#8a9a78" opacity=".14"/></svg></div>
 <main id="view"><div class="loading">Loading…</div></main>
 <dialog id="dlg"></dialog>
-<script src="/app.js?v=5"></script>
+<script src="/app.js?v=6"></script>
 </body>
 </html>
