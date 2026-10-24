@@ -1,5 +1,5 @@
 // GET /api/home -> every group you're in, with where you stand in each
-import { handle, K, requireUser, parseMap, parseJSON, balances, settlePlan } from "./_lib.js";
+import { handle, K, requireUser, parseMap, parseJSON, balances, settlePlan, fixLegacyLook } from "./_lib.js";
 
 export default handle(async (req, res, db) => {
   const user = await requireUser(db, req);
@@ -8,7 +8,7 @@ export default handle(async (req, res, db) => {
   for (const gid of gids) {
     const k = K.g(gid);
     const [metaRaw, pid, okVer] = await Promise.all([db.get(k.meta), db.hget(k.members, user.id), db.hget(k.ok, user.id)]);
-    const meta = parseJSON(metaRaw, null);
+    const meta = await fixLegacyLook(db, parseJSON(metaRaw, null));
     if (!meta || !pid) { await db.srem(K.userGroups(user.id), gid); continue; }
     const base = { id: gid, name: meta.name, currency: meta.currency, emoji: meta.emoji || "", color: meta.color || "" };
     if (Number(okVer || 0) !== Number(meta.pcVer || 1)) { groups.push({ ...base, needPasscode: true }); continue; }

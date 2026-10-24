@@ -238,6 +238,23 @@ async function write(db, user, b, ip) {
       log = { action: "restored", type: e.type, desc: e.desc, amount: e.amount, from: e.paidBy, to: e.type === "payment" ? Object.keys(e.split || {})[0] : null };
       break;
     }
+    case "undoEntry": {
+      const e = parseJSON(await db.hget(k.entries, String(b.id || "")), null);
+      need(e, "That payment is already gone.");
+      need(e.type === "payment" && e.addedBy === me && now - (e.createdAt || 0) < 15 * 60000, "This can't be undone any more. Delete it from the payment instead.");
+      await db.hdel(k.entries, e.id);
+      log = { action: "undid", type: "payment", amount: e.amount, from: e.paidBy, to: Object.keys(e.split || {})[0] };
+      break;
+    }
+    case "setLook": {
+      const emoji = cleanEmoji(b.emoji);
+      need(emoji, "Pick an emoji.");
+      const color = cleanColor(b.color) || meta.color || "";
+      if (emoji === meta.emoji && color === meta.color) return { ok: true };
+      meta.emoji = emoji; meta.color = color; await saveMeta(db, meta);
+      log = { action: "look", name: emoji };
+      break;
+    }
     case "rename": {
       const name = cleanName(b.name);
       if (name === meta.name) return { ok: true };

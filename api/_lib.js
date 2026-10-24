@@ -191,7 +191,18 @@ export async function requireUser(db, req) {
 }
 
 /* ---------- groups ---------- */
-export async function loadMeta(db, gid) { return parseJSON(await db.get(K.g(gid).meta), null); }
+export async function loadMeta(db, gid) { return fixLegacyLook(db, parseJSON(await db.get(K.g(gid).meta), null)); }
+// The first group was made before groups had a look. Give it the 🏞️ it already carried in its name.
+export async function fixLegacyLook(db, meta) {
+  if (!meta || meta.id !== LEGACY_GID || meta.lookSet) return meta;
+  meta.lookSet = true;
+  if (!meta.emoji) meta.emoji = "🏞️";
+  if (!meta.color) meta.color = "#1f7f93";
+  const name = String(meta.name || "").replace(/\s*🏞\uFE0F?\s*/gu, " ").replace(/\s+/g, " ").trim();
+  if (name) meta.name = name;
+  await saveMeta(db, meta);
+  return meta;
+}
 export async function saveMeta(db, m) { await db.set(K.g(m.id).meta, JSON.stringify(m)); }
 
 // Checks the user belongs to the group and has entered the current passcode.
