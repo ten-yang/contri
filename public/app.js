@@ -361,13 +361,11 @@ function lookPicker(meta){
 
 function viewEmptyHome(){
   const u = S.user;
-  return `<div class="topbar">
-    <div class="row" style="gap:8px"><span class="brand-mark" style="width:28px;height:28px;border-radius:8px" aria-hidden="true"></span><span style="font-family:var(--display);font-weight:700;font-size:22px">Hi, ${esc(u.username)}</span></div>
-    <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button>
-  </div>
+  return `<div class="topbar"><h1 style="font-size:28px;overflow-wrap:anywhere;min-width:0">Hello, ${esc(u.username)}</h1>
+    <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button></div>
   <div class="stack center" style="margin-top:24px;align-items:center">
     <img class="illus" src="/assets/empty-groups.webp" alt="" width="600" height="500">
-    <h1>No groups yet</h1>
+    <h2 style="font-size:28px">No groups yet</h2>
     <p class="muted" style="max-width:320px">Start one for a trip, your flat, or a dinner out. Or open an invite link a friend sent you.</p>
   </div>
   <div class="stack tight" style="margin-top:auto">
@@ -1323,7 +1321,8 @@ const FORMS = {
     history.replaceState({}, "", location.pathname); render();
   },
   async joinlink(f, err){
-    const m = String(f.link || "").match(/\/g\/([A-Za-z0-9]{10})/) || String(f.link || "").trim().match(/^([A-Za-z0-9]{10})$/);
+    const raw = String(f.link || "").normalize("NFKC").replace(/[\u00AD\u200B-\u200F\u2060\uFEFF\s*<>"'`]/g, "");
+    const m = raw.match(/\/g\/([A-Za-z0-9]{10})(?![A-Za-z0-9])/) || raw.match(/^([A-Za-z0-9]{10})$/);
     if (!m){ err.textContent = "That doesn't look like a Contri invite link. It ends in /g/ and 10 letters and numbers."; return; }
     go(`/g/${m[1]}`, { fresh: true });
   },
