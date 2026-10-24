@@ -301,7 +301,6 @@ function viewRecovery(){
 }
 
 /* ---------- home ---------- */
-function greeting(){ const h = new Date().getHours(); return h < 12 ? "Good morning," : h < 17 ? "Good afternoon," : "Good evening,"; }
 function viewHome(){
   const u = S.user, gs = S.home.groups;
   const net = {};
@@ -311,9 +310,8 @@ function viewHome(){
   const cline = c => { const v = net[c] || 0;
     return `<div class="cline"><span class="csym" aria-hidden="true">${esc(curSymbol(c))}</span><span class="l">${v > 0 ? "You're owed" : v < 0 ? "You owe" : "You're settled up"}</span><b style="color:${v > 0 ? "#d9ead0" : v < 0 ? "#ffd2c2" : "#fff"}">${fmt(Math.abs(v), c)}</b></div>`; };
   const settles = gs.flatMap(g => (g.settles || []).map(s => ({ ...s, g })));
-  return `<div class="topbar"><span class="greet">${greeting()}</span>
+  return `<div class="topbar"><h1 style="font-size:28px;overflow-wrap:anywhere;min-width:0">Hello, ${esc(u.username)}</h1>
     <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button></div>
-  <h1 style="font-size:30px;margin-top:-12px;overflow-wrap:anywhere">${esc(u.username)}</h1>
   <section class="hero" aria-label="Where you stand, by currency" style="padding:14px 20px">
     <div class="lbl" style="font-size:11px;margin-bottom:4px">Overall, by currency</div>
     ${curs.map(cline).join("")}
@@ -337,14 +335,24 @@ function viewHome(){
     <button type="button" class="btn primary lg" data-act="create">Create a group</button>
   </div>`;
 }
-function lookPicker(){
-  const em = S.ui.emoji !== undefined ? S.ui.emoji : QUICK_EMOJI[0];
-  const col = S.ui.color || LOOK_COLORS[0];
-  return `<div class="field look"><span class="eyebrow">Pick a look</span>
+function emojiHint(){
+  const ua = navigator.userAgent || "";
+  if (matchMedia("(pointer:coarse)").matches) return "Tap the box, then switch to your emoji keyboard with the 😊 or 🌐 key.";
+  if (/Mac/i.test(ua)) return "Click the box, then press Control + Command + Space to open emojis.";
+  if (/Win/i.test(ua)) return "Click the box, then press the Windows key + period (.) to open emojis.";
+  return "Click the box and pick an emoji from your keyboard's emoji list.";
+}
+function lookPicker(meta){
+  const em = S.ui.emoji !== undefined ? S.ui.emoji : (meta && meta.emoji) || QUICK_EMOJI[0];
+  const col = S.ui.color || (meta && meta.color) || LOOK_COLORS[0];
+  return `<div class="field look"><span class="eyebrow">${meta ? "Group look" : "Pick a look"}</span>
     <div class="row" style="gap:12px;align-items:center">
-      <label class="emo-pick" id="emoTile" style="background:${col}26"><span id="emoShow" aria-hidden="true">${esc(em)}</span><input id="gEmoji" name="emoji" type="text" value="${esc(em)}" autocomplete="off" aria-label="Group emoji. Type or pick any emoji"></label>
-      <div style="font-size:13px;line-height:1.45"><b style="font-size:14px">Tap to use any emoji</b><br><span class="muted">Your keyboard's emoji picker opens. Or pick a quick one below.</span></div>
+      <span class="emo-pick" id="emoTile" style="background:${col}26" aria-hidden="true"><span id="emoShow">${esc(em)}</span></span>
+      <div class="field" style="flex:1;gap:4px"><label class="tiny" for="gEmoji" style="font-weight:600">Use any emoji</label>
+        <input id="gEmoji" name="emoji" type="text" value="${esc(em)}" autocomplete="off" maxlength="16" placeholder="Tap here, then pick an emoji">
+      </div>
     </div>
+    <span class="hint">${esc(emojiHint())} Or pick a quick one:</span>
     <div class="quick" role="group" aria-label="Quick emoji">${QUICK_EMOJI.map(x => `<button type="button" data-act="quickEmo" data-e="${esc(x)}" aria-pressed="${x === em}" aria-label="Use ${esc(x)}">${esc(x)}</button>`).join("")}</div>
     <div class="field" style="gap:8px"><span class="eyebrow" id="colLbl">Color</span>
       <div class="colors" role="radiogroup" aria-labelledby="colLbl">${LOOK_COLORS.map((c, i) => `<label style="background:${c}"><input type="radio" name="color" value="${c}" ${c === col ? "checked" : ""} aria-label="Color ${i + 1}"></label>`).join("")}</div></div>
@@ -676,6 +684,8 @@ function actText(g, a){
     case "edited": return `edited ${thing}${a.before !== undefined ? `, was ${fmt(a.before, cur)}` : ""}`;
     case "deleted": return `<span class="neg">deleted</span> ${thing}`;
     case "restored": return `restored ${thing}`;
+    case "undid": return `undid ${thing}`;
+    case "look": return `changed the group emoji to ${esc(a.name)}`;
     case "created": return "created the group";
     case "self-joined": return "joined the group";
     case "joined": return `added <b>${esc(a.name)}</b> to the group`;
@@ -743,6 +753,7 @@ function viewSettings(g){
     <label class="eyebrow" for="sn">Group name</label>
     <input id="sn" name="name" type="text" maxlength="60" value="${esc(g.meta.name)}" enterkeyhint="done">
   </form>
+  ${lookPicker(g.meta)}
   <div class="field">
     <div class="tip-wrap"><label class="eyebrow" for="scur">Money</label><button type="button" class="ibtn" data-act="tip" aria-expanded="${!!S.ui.tip}" aria-controls="curTip" aria-label="About the money setting">i</button>
       <div class="tip" id="curTip" role="tooltip" ${S.ui.tip ? "" : "hidden"}>This only changes the currency symbol. Amounts aren't converted, so $50 becomes ₹50.</div></div>
@@ -1192,7 +1203,7 @@ const ACT = {
     const g = G(); const u = S.ui.undo; if (!u) return;
     el.disabled = true;
     try {
-      await api("POST", "/api/group", { op: "delEntry", g: g.meta.id, id: u.id });
+      await api("POST", "/api/group", { op: "undoEntry", g: g.meta.id, id: u.id });
       await loadGroup(g.meta.id); S.ui.undo = null; toast("Undone");
       const y = window.scrollY; render(); window.scrollTo(0, y);
     } catch (e){ el.disabled = false; handleErr(e); }
@@ -1201,7 +1212,7 @@ const ACT = {
     V.querySelectorAll("[data-act=cf]").forEach(b => b.setAttribute("aria-pressed", (S.ui.cf || "").toLowerCase() === b.dataset.c.toLowerCase()));
     V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf, cf: S.ui.cf }); },
   quickEmo: el => { const e = el.dataset.e; const i = V.querySelector("#gEmoji"); i.value = e; V.querySelector("#emoShow").textContent = e; S.ui.emoji = e;
-    V.querySelectorAll("[data-act=quickEmo]").forEach(b => b.setAttribute("aria-pressed", b === el)); },
+    V.querySelectorAll("[data-act=quickEmo]").forEach(b => b.setAttribute("aria-pressed", b === el)); saveLook(); },
   pf: el => { S.ui.pf = el.dataset.id; const g = G();
     V.querySelectorAll("[data-act=pf]").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === S.ui.pf));
     V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf, cf: S.ui.cf }); },
@@ -1266,8 +1277,8 @@ V.addEventListener("input", ev => {
     V.querySelectorAll("[data-act=quickEmo]").forEach(b => b.setAttribute("aria-pressed", b.dataset.e === e)); } }
 });
 V.addEventListener("change", ev => {
-  if (ev.target.name === "color" && V.querySelector("#emoTile")){ S.ui.color = ev.target.value; V.querySelector("#emoTile").style.background = ev.target.value + "26"; }
-  if (ev.target.id === "gEmoji"){ const e = firstEmoji(ev.target.value); ev.target.value = e || S.ui.emoji || QUICK_EMOJI[0]; V.querySelector("#emoShow").textContent = ev.target.value; }
+  if (ev.target.name === "color" && V.querySelector("#emoTile")){ S.ui.color = ev.target.value; V.querySelector("#emoTile").style.background = ev.target.value + "26"; saveLook(); }
+  if (ev.target.id === "gEmoji"){ const e = firstEmoji(ev.target.value); ev.target.value = e || S.ui.emoji || (G() && G().meta && G().meta.emoji) || QUICK_EMOJI[0]; V.querySelector("#emoShow").textContent = ev.target.value; if (e) saveLook(); }
   if (ev.target.id === "rcOk"){ V.querySelector("#rcDone").disabled = !ev.target.checked; }
   if (ev.target.id === "scur") setCurrency(ev.target);
   if (ev.target.id === "sn") renameGroup(ev.target);
@@ -1277,6 +1288,15 @@ async function setCurrency(sel){
   const g = G();
   try { await api("POST", "/api/group", { op: "setCurrency", g: g.meta.id, currency: sel.value }); await loadGroup(g.meta.id); toast("Money updated"); }
   catch (e){ sel.value = g.meta.currency; handleErr(e); }
+}
+async function saveLook(){
+  const r = route(); if (r.sec !== "settings") return;
+  const g = G(); if (!g || !g.meta) return;
+  const emoji = firstEmoji(V.querySelector("#gEmoji").value) || g.meta.emoji;
+  const c = V.querySelector("input[name=color]:checked"); const color = c ? c.value : g.meta.color;
+  if (!emoji || (emoji === g.meta.emoji && color === g.meta.color)) return;
+  try { await api("POST", "/api/group", { op: "setLook", g: g.meta.id, emoji, color }); await loadGroup(g.meta.id); S.home = null; toast("Group look updated"); }
+  catch (e){ handleErr(e); }
 }
 async function renameGroup(inp){
   const g = G(); const name = inp.value.trim();
