@@ -308,8 +308,7 @@ function viewHome(){
   const u = S.user, gs = S.home.groups;
   const net = {};
   for (const g of gs){ if (g.needPasscode) continue; net[g.currency] = (net[g.currency] || 0) + (g.net || 0); }
-  const curs = Object.keys(net).sort((a, z) => Math.abs(net[z]) - Math.abs(net[a]));
-  if (!curs.length) curs.push(gs[0] ? gs[0].currency : "USD");
+  const curs = Object.keys(net).filter(c => Math.abs(net[c]) >= 0.005).sort((a, z) => Math.abs(net[z]) - Math.abs(net[a]));
   const light = curs.some(c => (net[c] || 0) < 0);
   const cline = c => { const v = net[c] || 0;
     const col = v < 0 ? "#fff" : v > 0 ? (light ? "var(--pos)" : "#d9ead0") : (light ? "var(--ink)" : "#fff");
@@ -319,7 +318,7 @@ function viewHome(){
     <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button></div>
   <div class="${light ? "tixwrap" : ""}"><section class="hero${light ? " light" : ""}" aria-label="Where you stand, by currency" style="padding:14px 20px">
     <div class="lbl" style="font-size:11px;margin-bottom:4px">Overall, by currency</div>
-    ${curs.map(cline).join("")}
+    ${curs.length ? curs.map(cline).join("") : `<div class="cline"><span class="l">You're all settled up</span></div>`}
   </section></div>
   ${settles.length ? `<section class="card pad stack" style="gap:10px">
     <div class="between"><h2>Settle up</h2><span class="tiny muted">${settles.length} payment${settles.length === 1 ? "" : "s"}</span></div>
@@ -332,7 +331,7 @@ function viewHome(){
       <span class="stripe" style="background:${esc(g.color || "var(--accent)")}"></span>
       ${groupEmo(g)}
       <span class="grow"><b>${esc(g.name)}</b><span class="meta">${g.needPasscode ? "Passcode changed: tap to enter the new one" : `${faces((g.faces || []), "xs")}<span>Updated ${esc(ago(g.updated))}</span>`}</span></span>
-      ${g.needPasscode ? ICON.chev : `<span class="right"><span class="v ${g.net > 0 ? "pos" : g.net < 0 ? "neg" : "muted"}" style="display:block">${fmt(Math.abs(g.net || 0), g.currency)}</span><span class="t">${g.net > 0 ? "you're owed" : g.net < 0 ? "you owe" : "settled"}</span></span>`}
+      ${g.needPasscode ? ICON.chev : (Math.abs(g.net || 0) < 0.005 ? `<span class="right"><span class="t">Settled up</span></span>` : `<span class="right"><span class="v ${g.net > 0 ? "pos" : "neg"}" style="display:block">${fmt(Math.abs(g.net), g.currency)}</span><span class="t">${g.net > 0 ? "you're owed" : "you owe"}</span></span>`)}
     </a>`).join("")}
   </section>
   <div class="grid2" style="margin-top:auto">
