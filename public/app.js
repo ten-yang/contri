@@ -2,7 +2,7 @@
 "use strict";
 const V = document.getElementById("view");
 const DLG = document.getElementById("dlg");
-const POLL_MS = 20000;
+const POLL_MS = 10000;
 const BUILT_IN = ["Groceries","Dining","Lodging","Rent","Utilities","Travel","Transport","Shopping","Fun","Health","Other"];
 const CURRENCIES = [["USD","USD $"],["INR","INR ₹"],["EUR","EUR €"],["GBP","GBP £"],["CAD","CAD $"]];
 const MAX_RX = 4;
@@ -38,9 +38,11 @@ function ago(t){
 const shortDate = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const dot = (p, cls = "") => `<span class="dot ${cls}" style="background:${esc((p && p.color) || "#7a6f5c")}" aria-hidden="true">${esc(initial(p && p.name))}</span>`;
 const ICON = {
+  eye: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  eyeOff: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`,
   back: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>`,
   chev: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6b5c" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`,
-  alert: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a8452a" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>`,
+  alert: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c63f3f" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>`,
   info: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f6146" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>`,
   key: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4f6146" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M17 6l3 3"/><path d="M15 8l2 2"/></svg>`,
   check: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>`,
@@ -264,12 +266,13 @@ function viewAuth(r){
       <input id="au" name="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
       ${create ? `<span class="hint" id="auHint">This is the name your groups will see.</span>` : ""}</div>
     <div class="field"><label class="eyebrow" for="ap">Password</label>
-      <input id="ap" name="password" type="password" autocomplete="${create ? "new-password" : "current-password"}" minlength="8" required>
+      <span class="pwwrap"><input id="ap" name="password" type="password" autocomplete="${create ? "new-password" : "current-password"}" minlength="8" required><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span>
       ${create ? `<span class="hint">At least 8 characters.</span>` : ""}</div>
     ${create ? "" : `<button type="button" class="linkbtn" data-act="toReset" style="align-self:flex-start">Forgot password?</button>`}
     <div class="err" id="aErr" role="alert"></div>
     <button class="btn primary full" type="submit">${create ? "Create profile" : "Log in"}</button>
-  </form>`;
+  </form>
+  <p class="credit"><a href="https://storyset.com" target="_blank" rel="noopener noreferrer">Illustrations by Storyset</a></p>`;
 }
 function viewReset(){
   return `${backLink("Log in", "toLogin")}
@@ -278,7 +281,7 @@ function viewReset(){
   <form class="stack" data-form="reset" novalidate style="gap:16px">
     <div class="field"><label class="eyebrow" for="ru">Username</label><input id="ru" name="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
     <div class="field"><label class="eyebrow" for="rc">Recovery code</label><input id="rc" name="code" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX" style="font-family:var(--mono)"></div>
-    <div class="field"><label class="eyebrow" for="rn">New password</label><input id="rn" name="password" type="password" autocomplete="new-password"><span class="hint">At least 8 characters.</span></div>
+    <div class="field"><label class="eyebrow" for="rn">New password</label><span class="pwwrap"><input id="rn" name="password" type="password" autocomplete="new-password"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span><span class="hint">At least 8 characters.</span></div>
     <div class="card pad note">${ICON.info}<span>After this, you'll get a new recovery code. Your old one stops working.</span></div>
     <div class="err" id="rErr" role="alert"></div>
     <button class="btn primary full" type="submit">Set new password</button>
@@ -308,7 +311,7 @@ function viewHome(){
   const curs = Object.keys(net).sort((a, z) => Math.abs(net[z]) - Math.abs(net[a]));
   if (!curs.length) curs.push(gs[0] ? gs[0].currency : "USD");
   const cline = c => { const v = net[c] || 0;
-    return `<div class="cline"><span class="csym" aria-hidden="true">${esc(curSymbol(c))}</span><span class="l">${v > 0 ? "You're owed" : v < 0 ? "You owe" : "You're settled up"}</span><b style="color:${v > 0 ? "#d9ead0" : v < 0 ? "#ffd2c2" : "#fff"}">${fmt(Math.abs(v), c)}</b></div>`; };
+    return `<div class="cline${v < 0 ? " owe" : ""}"><span class="csym" aria-hidden="true">${esc(curSymbol(c))}</span><span class="l">${v > 0 ? "You're owed" : v < 0 ? "You owe" : "You're settled up"}</span><b style="color:${v > 0 ? "#d9ead0" : "#fff"}">${fmt(Math.abs(v), c)}</b></div>`; };
   const settles = gs.flatMap(g => (g.settles || []).map(s => ({ ...s, g })));
   return `<div class="topbar"><h1 style="font-size:28px;overflow-wrap:anywhere;min-width:0">Hello, ${esc(u.username)}</h1>
     <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button></div>
@@ -439,7 +442,7 @@ function viewCreate(){
   <h1>Create a group</h1>
   <form class="stack" data-form="create" novalidate style="gap:14px">
     <div class="field"><label class="eyebrow" for="gn">Group name</label><input id="gn" name="name" type="text" maxlength="60" placeholder="Flat 4B, Goa trip, Friday dinners" autofocus></div>
-    <div class="field"><label class="eyebrow" for="gp">Group passcode</label><input id="gp" name="passcode" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="mango-rooftop-17">
+    <div class="field"><label class="eyebrow" for="gp">Group passcode</label><span class="pwwrap"><input id="gp" name="passcode" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="mango-rooftop-17"><button type="button" class="eye" data-act="peek" aria-label="Hide" aria-pressed="true">${ICON.eyeOff}</button></span>
       <span class="hint">Friends need this and the link to join. At least 6 characters.</span></div>
     <div class="field"><label class="eyebrow" for="gc">Money</label>
       <select id="gc" name="currency">${CURRENCIES.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select>
@@ -460,7 +463,7 @@ function viewJoin(gid, g){
   </div>
   <form class="stack" data-form="join" novalidate>
     <div class="field"><label class="eyebrow" for="jp">Group passcode</label>
-      <input id="jp" name="passcode" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" ${ch ? "readonly" : "autofocus"} value="${esc(S.ui.pc || "")}"></div>
+      <span class="pwwrap"><input id="jp" name="passcode" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" ${ch ? "readonly" : "autofocus"} value="${esc(S.ui.pc || "")}"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span></div>
     ${ch ? `<section class="card pad stack" style="gap:10px">
       <h2>Which one is you?</h2>
       <p class="small muted">This group has names that aren't linked to a profile yet. Pick yours to keep your past expenses.</p>
@@ -476,7 +479,7 @@ function viewPasscode(gid, g){
   <div class="stack tight"><span class="eyebrow">Passcode changed</span><h1>${esc(g.invite.name)}</h1>
   <p class="muted">The person who created this group changed its passcode. Enter the new one to keep going. Ask them if you don't have it.</p></div>
   <form class="stack" data-form="verify" novalidate>
-    <div class="field"><label class="eyebrow" for="vp">New passcode</label><input id="vp" name="passcode" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus></div>
+    <div class="field"><label class="eyebrow" for="vp">New passcode</label><span class="pwwrap"><input id="vp" name="passcode" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span></div>
     <div class="err" id="vErr" role="alert"></div>
     <button class="btn primary full" type="submit">Open group</button>
   </form>`;
@@ -511,7 +514,7 @@ function headerLine(g){
 function heroCard(g){
   const v = balances(g)[g.me] || { net: 0, paid: 0, share: 0 }, cur = g.meta.currency;
   const lbl = v.net > 0 ? "You're owed" : v.net < 0 ? "You owe" : "You're settled up";
-  return `<section class="hero" aria-label="Your balance">
+  return `<section class="hero${v.net < 0 ? " owe" : ""}" aria-label="Your balance">
     <div class="lbl">${lbl}</div>
     <div class="big">${fmt(Math.abs(v.net), cur)}</div>
     <div class="tear"></div>
@@ -598,7 +601,7 @@ function dayLabel(d){
 }
 function ledgerHtml(g, f = {}){
   if (!g.entries.length) return `<section class="card pad stack center" style="align-items:center">
-    <img class="illus" style="max-width:220px" src="/assets/empty.webp" width="640" height="592" alt="">
+    <img class="illus" style="max-width:220px" src="/assets/empty.webp?v=2" width="640" height="640" alt="">
     <h2>No expenses yet</h2><p class="small muted">Log the first one: who paid, how much, and who it was for.</p></section>`;
   const q = (f.q || "").trim().toLowerCase(), pf = f.pf && f.pf !== "all" ? f.pf : "", cf = (f.cf || "").toLowerCase();
   const list = g.entries.filter(e => !pf || e.paidBy === pf || (e.split && pf in e.split))
@@ -1139,6 +1142,8 @@ async function copyText(t, okMsg){
 
 /* ---------- clicks ---------- */
 const ACT = {
+  peek: el => { const i = el.parentElement.querySelector("input"); const show = i.type === "password"; i.type = show ? "text" : "password";
+    el.setAttribute("aria-pressed", String(show)); el.setAttribute("aria-label", show ? "Hide" : "Show"); el.innerHTML = show ? ICON.eyeOff : ICON.eye; i.focus(); },
   retry: () => render(),
   home: () => go("/", {}),
   back: () => history.length > 1 ? history.back() : go("/"),
@@ -1160,13 +1165,13 @@ const ACT = {
   logout: async () => { try { await api("POST", "/api/auth", { op: "logout" }); } catch {} S.user = null; S.home = null; S.g = {}; go("/", {}); },
   dlgUsername: () => openDialog(dlgShell("Change username", `<div class="field"><label class="eyebrow" for="du">New username</label><input id="du" name="username" type="text" autocapitalize="off" spellcheck="false" maxlength="20" value="${esc(S.user.username)}"><span class="hint">3 to 20 letters, numbers, dots or underscores. Groups will see the new name.</span></div>`, "Save"),
     async f => { const d = await api("POST", "/api/auth", { op: "changeUsername", username: f.username }); S.user = { ...S.user, ...d.user }; S.home = null; S.g = {}; DLG.close(); toast("Username changed"); render(); }),
-  dlgPassword: () => openDialog(dlgShell("Change password", `<div class="field"><label class="eyebrow" for="dc">Current password</label><input id="dc" name="current" type="password" autocomplete="current-password"></div>
-    <div class="field"><label class="eyebrow" for="dn">New password</label><input id="dn" name="password" type="password" autocomplete="new-password"><span class="hint">At least 8 characters. Other devices will be logged out.</span></div>`, "Save"),
+  dlgPassword: () => openDialog(dlgShell("Change password", `<div class="field"><label class="eyebrow" for="dc">Current password</label><span class="pwwrap"><input id="dc" name="current" type="password" autocomplete="current-password"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span></div>
+    <div class="field"><label class="eyebrow" for="dn">New password</label><span class="pwwrap"><input id="dn" name="password" type="password" autocomplete="new-password"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span><span class="hint">At least 8 characters. Other devices will be logged out.</span></div>`, "Save"),
     async f => { await api("POST", "/api/auth", { op: "changePassword", current: f.current, password: f.password }); DLG.close(); toast("Password changed"); }),
-  dlgRecovery: () => openDialog(dlgShell("New recovery code", `<p class="small muted">Your old code will stop working. Enter your password to continue.</p><div class="field"><label class="eyebrow" for="dr">Password</label><input id="dr" name="password" type="password" autocomplete="current-password"></div>`, "Get new code"),
+  dlgRecovery: () => openDialog(dlgShell("New recovery code", `<p class="small muted">Your old code will stop working. Enter your password to continue.</p><div class="field"><label class="eyebrow" for="dr">Password</label><span class="pwwrap"><input id="dr" name="password" type="password" autocomplete="current-password"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span></div>`, "Get new code"),
     async f => { const d = await api("POST", "/api/auth", { op: "newRecovery", password: f.password }); DLG.close(); S.showCode = { code: d.recoveryCode }; render(); }),
   dlgDelete: () => openDialog(dlgShell("Delete your profile?", `<p class="small" style="color:var(--body2)">You'll leave every group. Your past expenses stay in them, shown as "former member". You need to be settled up everywhere first. If you're the only one left in a group you created, that group is deleted too. This can't be undone.</p>
-    <div class="field"><label class="eyebrow" for="dd">Password</label><input id="dd" name="password" type="password" autocomplete="current-password"></div>`, "Delete profile", true),
+    <div class="field"><label class="eyebrow" for="dd">Password</label><span class="pwwrap"><input id="dd" name="password" type="password" autocomplete="current-password"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span></div>`, "Delete profile", true),
     async f => { await api("POST", "/api/auth", { op: "deleteProfile", password: f.password }); DLG.close(); S.user = null; S.home = null; S.g = {}; toast("Profile deleted"); go("/", {}); }),
   pick: el => { S.ui.claim = el.dataset.id; S.ui.pc = V.querySelector("#jp").value; render(); },
   invite: () => { const g = G(); copyText(`Join "${g.meta.name}" on Contri so we can split costs: ${inviteLink(g.meta.id)}\nI'll send you the passcode separately.`, "Invite copied"); },
@@ -1228,7 +1233,7 @@ const ACT = {
     catch (e){ el.disabled = false; handleErr(e, V.querySelector("#bkErr")); }
   },
   tip: () => { S.ui.tip = !S.ui.tip; const t = V.querySelector("#curTip"); t.hidden = !S.ui.tip; V.querySelector("[data-act=tip]").setAttribute("aria-expanded", S.ui.tip); },
-  dlgPasscode: () => openDialog(dlgShell("Change passcode", `<div class="field"><label class="eyebrow" for="dp">New passcode</label><input id="dp" name="passcode" type="text" autocapitalize="off" autocomplete="off" spellcheck="false"><span class="hint">At least 6 characters. Everyone else will be asked for it the next time they open the group.</span></div>`, "Change passcode"),
+  dlgPasscode: () => openDialog(dlgShell("Change passcode", `<div class="field"><label class="eyebrow" for="dp">New passcode</label><span class="pwwrap"><input id="dp" name="passcode" type="text" autocapitalize="off" autocomplete="off" spellcheck="false"><button type="button" class="eye" data-act="peek" aria-label="Hide" aria-pressed="true">${ICON.eyeOff}</button></span><span class="hint">At least 6 characters. Everyone else will be asked for it the next time they open the group.</span></div>`, "Change passcode"),
     async f => { const g = G(); await api("POST", "/api/group", { op: "changePasscode", g: g.meta.id, passcode: f.passcode }); await loadGroup(g.meta.id); DLG.close(); toast("Passcode changed. Send it to the group."); render(); }),
   leave: async el => {
     const g = G();
@@ -1371,24 +1376,37 @@ let polling = false;
 async function poll(){
   const r = route();
   if (polling || document.visibilityState !== "visible" || DLG.open || !S.user) return;
-  if (!r.gid || r.sec === "expense" || r.sec === "pay" || r.sec === "leave") return;
+  if (r.sec === "expense" || r.sec === "pay" || r.sec === "leave") return;
+  const a = document.activeElement;
+  if (a && a !== document.body && a.matches("input,select,textarea") && a.type !== "search") return;
+  if (!r.gid) return pollHome(r);
   const g = S.g[r.gid];
   if (!g || !g.meta) return;
-  const a = document.activeElement;
-  if (a && a !== document.body && a.matches("input,select,textarea")) return;
   polling = true;
   try {
     const before = new Set(g.entries.map(e => e.id + ":" + (e.editedAt || e.createdAt)));
     if (await loadGroup(r.gid, true)){
       const ng = S.g[r.gid];
       if (ng.meta) S.fresh = new Set(ng.entries.filter(e => !before.has(e.id + ":" + (e.editedAt || e.createdAt))).map(e => e.id));
-      const y = window.scrollY; await render(); window.scrollTo(0, y);
+      const y = window.scrollY, f = document.activeElement, fid = f && f.id, sel = fid && f.selectionStart;
+      await render(); window.scrollTo(0, y);
+      if (fid){ const n = document.getElementById(fid); if (n){ n.focus({ preventScroll: true }); try { n.setSelectionRange(sel, sel); } catch {} } }
     }
     const off = V.querySelector("#offline"); if (off) off.hidden = true;
   } catch (e){
     if (e.status === 0){ const off = V.querySelector("#offline"); if (off){ off.textContent = "You're offline. Changes from others will show up when you reconnect."; off.hidden = false; } }
     else if (e.status === 401 || e.status === 403 || e.status === 404){ delete S.g[r.gid]; render(); }
   } finally { polling = false; }
+}
+async function pollHome(r){
+  if (r.v || !S.home) return;
+  polling = true;
+  try {
+    const d = await api("GET", "/api/home");
+    if (JSON.stringify(d) !== JSON.stringify(S.home) && !route().gid && !route().v && !DLG.open){
+      S.home = d; const y = window.scrollY; paint(S.home.groups.length ? viewHome() : viewEmptyHome(), "", true); window.scrollTo(0, y);
+    }
+  } catch {} finally { polling = false; }
 }
 setInterval(poll, POLL_MS);
 document.addEventListener("visibilitychange", () => {
