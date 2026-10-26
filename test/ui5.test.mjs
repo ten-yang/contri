@@ -50,7 +50,7 @@ async function add(p, desc, amt){ await p.click("button:has-text('Add expense')"
 await b.reload(); await b.waitForSelector(".hero"); await add(b, "Pizza", "40");
 await a.waitForFunction(() => document.querySelector(".hero .lbl")?.textContent.includes("You owe"), null, { timeout: 15000 });
 ok(true, "group page updates within ~10 seconds");
-ok(await bg(a, ".hero") !== greenBg && (await bg(a, ".hero")).includes("168, 69, 42"), "You owe ticket is red");
+ok(await bg(a, ".hero") !== greenBg && (await bg(a, ".hero")).includes("198, 63, 63"), "You owe ticket is red");
 await shot(a, "owe-red");
 
 // Expenses page with Search focused still refreshes, and focus stays
