@@ -5,6 +5,9 @@ import { store, K, saveBackup, purgeTrash } from "./_lib.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
+  // Only Vercel's scheduler may run this. Vercel sends "Bearer <CRON_SECRET>" when that setting exists.
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ error: "Not allowed." });
   const db = store();
   if (!db) return res.status(500).json({ error: "Storage isn't connected." });
   const day = new Date().toISOString().slice(0, 10);
