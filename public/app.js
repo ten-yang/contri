@@ -310,15 +310,17 @@ function viewHome(){
   for (const g of gs){ if (g.needPasscode) continue; net[g.currency] = (net[g.currency] || 0) + (g.net || 0); }
   const curs = Object.keys(net).sort((a, z) => Math.abs(net[z]) - Math.abs(net[a]));
   if (!curs.length) curs.push(gs[0] ? gs[0].currency : "USD");
+  const light = curs.some(c => (net[c] || 0) < 0);
   const cline = c => { const v = net[c] || 0;
-    return `<div class="cline${v < 0 ? " owe" : ""}"><span class="csym" aria-hidden="true">${esc(curSymbol(c))}</span><span class="l">${v > 0 ? "You're owed" : v < 0 ? "You owe" : "You're settled up"}</span><b style="color:${v > 0 ? "#d9ead0" : "#fff"}">${fmt(Math.abs(v), c)}</b></div>`; };
+    const col = v < 0 ? "#fff" : v > 0 ? (light ? "var(--pos)" : "#d9ead0") : (light ? "var(--ink)" : "#fff");
+    return `<div class="cline${v < 0 ? " owe" : v > 0 ? " owed" : ""}"><span class="csym" aria-hidden="true">${esc(curSymbol(c))}</span><span class="l">${v > 0 ? "You're owed" : v < 0 ? "You owe" : "You're settled up"}</span><b style="color:${col}">${fmt(Math.abs(v), c)}</b></div>`; };
   const settles = gs.flatMap(g => (g.settles || []).map(s => ({ ...s, g })));
   return `<div class="topbar"><h1 style="font-size:28px;overflow-wrap:anywhere;min-width:0">Hello, ${esc(u.username)}</h1>
     <button type="button" class="avatar" data-act="profile" aria-label="Your profile">${esc(initial(u.username))}</button></div>
-  <section class="hero" aria-label="Where you stand, by currency" style="padding:14px 20px">
+  <div class="${light ? "tixwrap" : ""}"><section class="hero${light ? " light" : ""}" aria-label="Where you stand, by currency" style="padding:14px 20px">
     <div class="lbl" style="font-size:11px;margin-bottom:4px">Overall, by currency</div>
     ${curs.map(cline).join("")}
-  </section>
+  </section></div>
   ${settles.length ? `<section class="card pad stack" style="gap:10px">
     <div class="between"><h2>Settle up</h2><span class="tiny muted">${settles.length} payment${settles.length === 1 ? "" : "s"}</span></div>
     ${settles.map((s, i) => `<div class="sunkrow"><div class="grow"><span style="font-size:14px">${s.mine === "get" ? `<b>${esc(s.fromName)}</b> pays you` : `You pay <b>${esc(s.toName)}</b>`} <b class="num">${fmt(s.c, s.g.currency)}</b></span><span class="tiny muted">${esc(s.g.name)}</span></div>
