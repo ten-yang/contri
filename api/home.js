@@ -1,8 +1,10 @@
 // GET /api/home -> every group you're in, with where you stand in each
-import { handle, K, requireUser, parseMap, parseJSON, balances, settlePlan, fixLegacyLook } from "./_lib.js";
+import { handle, K, whoami, parseMap, parseJSON, balances, planFor, fixLegacyLook } from "./_lib.js";
 
 export default handle(async (req, res, db) => {
-  const user = await requireUser(db, req);
+  // Logged out is a normal answer here (not an error), so the app can start with this one call.
+  const user = await whoami(db, req);
+  if (!user) return res.status(200).json({ user: null, groups: [] });
   const gids = (await db.smembers(K.userGroups(user.id))) || [];
   const groups = [];
   for (const gid of gids) {
@@ -18,7 +20,7 @@ export default handle(async (req, res, db) => {
     const bal = balances(entries);
     const me = String(pid);
     const name = id => (ppl[id] ? ppl[id].name : "Someone");
-    const settles = settlePlan(bal).filter(s => s.from === me || s.to === me)
+    const settles = planFor(meta.settleMode, entries, bal).filter(s => s.from === me || s.to === me)
       .map(s => ({ from: s.from, to: s.to, c: s.c, fromName: name(s.from), toName: name(s.to), mine: s.from === me ? "pay" : "get" }));
     const lastLog = parseJSON((last || [])[0], null);
     groups.push({ ...base, me, net: (bal[me] || { net: 0 }).net,
@@ -26,5 +28,5 @@ export default handle(async (req, res, db) => {
       faces: Object.values(ppl).filter(p => !p.leftAt && p.id !== me).sort((a, z) => (a.order || 0) - (z.order || 0)).slice(0, 4).map(p => ({ name: p.name, color: p.color })), updated: lastLog ? lastLog.t : meta.createdAt, settles });
   }
   groups.sort((a, z) => (z.updated || 0) - (a.updated || 0));
-  return res.status(200).json({ user: { id: user.id, username: user.username }, groups });
+  return res.status(200).json({ user: { id: user.id, username: user.username, createdAt: user.createdAt }, groups });
 });

@@ -110,13 +110,30 @@ async function api(method, path, body){
   return data;
 }
 function handleErr(e, el){
-  if (e.status === 401 && !(e.data && e.data.badLogin)){ S.user = null; S.home = null; S.g = {}; render(); toast("Please log in again."); return; }
+  if (e.status === 401 && !(e.data && e.data.badLogin)){ clearHomeCache(); S.user = null; S.home = null; S.g = {}; render(); toast("Please log in again."); return; }
   if (e.status === 403 && e.data && (e.data.needPasscode || e.data.notMember)){ const gid = route().gid; if (gid) delete S.g[gid]; render(); return; }
   if (el) el.textContent = e.message; else toast(e.message);
 }
 
+/* ---------- saved Home (shown instantly on launch, then refreshed) ---------- */
+const HOME_KEY = "contri.home.v1";
+function readHomeCache(){ try { const c = JSON.parse(localStorage.getItem(HOME_KEY) || "null"); return c && c.user && c.home && Array.isArray(c.home.groups) ? c : null; } catch { return null; } }
+function saveHome(d){ S.home = d; try { localStorage.setItem(HOME_KEY, JSON.stringify({ user: S.user, home: d })); } catch {} }
+function clearHomeCache(){ try { localStorage.removeItem(HOME_KEY); } catch {} }
+function paintHome(keepScroll){ const y = window.scrollY; paint(S.home.groups.length ? viewHome() : viewEmptyHome(), "", true); if (keepScroll) window.scrollTo(0, y); }
+async function refreshHome(){
+  try {
+    const d = await api("GET", "/api/home");
+    if (!d.user){ clearHomeCache(); S.user = null; S.home = null; S.g = {}; return render(); }
+    S.user = { ...(S.user || {}), ...d.user };
+    const changed = JSON.stringify(d) !== JSON.stringify(S.home);
+    saveHome(d);
+    if (changed && !route().gid && !route().v && !DLG.open) paintHome(true);
+  } catch (e){ if (e.status === 401){ clearHomeCache(); S.user = null; S.home = null; S.g = {}; render(); } }
+}
+
 /* ---------- routing ---------- */
-const SECTIONS = ["expenses","standing","activity","backup","settings","leave","expense","pay","item"];
+const SECTIONS = ["expenses","standing","activity","backup","settings","leave","expense","pay","item","payments"];
 function route(){
   const m = location.pathname.match(/^\/g\/([A-Za-z0-9]{10})(?:\/([a-z]+))?(?:\/([a-z0-9]+))?\/?$/);
   const st = history.state || {};
@@ -175,6 +192,27 @@ function settlePlan(b){
   }
   return out;
 }
+// Who owes whom: pay back whoever paid for you, pair by pair (same as api/_lib.js directPlan).
+function directPlan(entries){
+  const M = {}, N = {};
+  const bump = (o, a, b, v) => { o[a] = o[a] || {}; o[a][b] = (o[a][b] || 0) + v; };
+  for (const e of entries) for (const [id, c] of Object.entries(e.split || {})){
+    if (id === e.paidBy || !c) continue;
+    bump(M, id, e.paidBy, c);
+    if (e.type !== "payment") bump(N, id, e.paidBy, 1);
+  }
+  const ids = new Set(); for (const a of Object.keys(M)){ ids.add(a); for (const b of Object.keys(M[a])) ids.add(b); }
+  const arr = [...ids].sort(), at = (o, a, b) => (o[a] && o[a][b]) || 0, out = [];
+  for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++){
+    const a = arr[i], b = arr[j], d = at(M, a, b) - at(M, b, a);
+    if (d > 0) out.push({ from: a, to: b, c: d, n: at(N, a, b), mixed: at(M, b, a) > 0 });
+    else if (d < 0) out.push({ from: b, to: a, c: -d, n: at(N, b, a), mixed: at(M, a, b) > 0 });
+  }
+  return out.sort((x, z) => z.c - x.c || x.from.localeCompare(z.from) || x.to.localeCompare(z.to));
+}
+const groupMode = g => (g.meta && g.meta.settleMode === "fewest") ? "fewest" : "direct";
+const MODE_NAME = { direct: "Who owes whom", fewest: "Fewest payments" };
+const planOf = (g, mode = groupMode(g)) => mode === "fewest" ? settlePlan(balances(g)) : directPlan(g.entries);
 const totalSpent = g => g.entries.filter(e => e.type !== "payment").reduce((s, e) => s + e.amount, 0);
 
 /* ---------- render ---------- */
@@ -184,9 +222,19 @@ async function render(){
   const r = route();
   DLG.open && DLG.close();
   try {
+    let quick = false;
     if (S.user === undefined){
-      const d = await api("GET", "/api/auth");
-      S.user = d.user;
+      const c = readHomeCache(), home = !r.gid && !r.v;
+      if (c){ S.user = c.user; if (home){ S.home = c.home; quick = true; } }
+      else if (home && !S.showCode){
+        // One call at startup: /api/home also says who you are.
+        const d = await api("GET", "/api/home");
+        S.user = d.user || null;
+        if (S.user){ saveHome(d); r.st = { ...r.st, refresh: false }; }
+      } else {
+        const d = await api("GET", "/api/auth");
+        S.user = d.user;
+      }
     }
     if (my !== rendering) return;
     if (S.showCode) return paint(viewRecovery(), "roomy");
@@ -200,14 +248,17 @@ async function render(){
       case "create": return paint(viewCreate());
       case "joinlink": return paint(viewJoinLink());
     }
+    if (quick){ paintHome(); refreshHome(); return; }
     if (!S.home || r.st.refresh !== false){
-      S.home = await api("GET", "/api/home");
+      const d = await api("GET", "/api/home");
       if (my !== rendering) return;
+      if (!d.user){ clearHomeCache(); S.user = null; S.home = null; return render(); }
+      S.user = { ...S.user, ...d.user }; saveHome(d);
     }
-    paint(S.home.groups.length ? viewHome() : viewEmptyHome(), "", true);
+    paintHome();
   } catch (e){
     if (my !== rendering) return;
-    if (e.status === 401){ S.user = null; return render(); }
+    if (e.status === 401){ clearHomeCache(); S.user = null; S.home = null; return render(); }
     paint(viewError(e.message));
   }
 }
@@ -223,6 +274,7 @@ async function renderGroup(r, my){
   document.title = `${g.meta.name} · Contri`;
   switch (r.sec){
     case "standing": return paint(viewStanding(g), "", true);
+    case "payments": return paint(viewPayments(g), "", true);
     case "expenses": return paint(viewExpenses(g), "", true);
     case "activity": return paint(viewActivity(g), "", true);
     case "backup": return paint(viewBackup(g));
@@ -539,7 +591,7 @@ function viewGroup(g){
     <a href="/g/${g.meta.id}/expenses" data-nav="/g/${g.meta.id}/expenses">Expenses<span class="side">${(() => { const k = g.entries.filter(e => e.type !== "payment").length; return k + " expense" + (k === 1 ? "" : "s"); })()}</span></a>
     <a href="/g/${g.meta.id}/activity" data-nav="/g/${g.meta.id}/activity">Activity<span class="side">${g.log.length >= 150 ? "150+" : g.log.length} change${g.log.length === 1 ? "" : "s"}</span></a>
     <a href="/g/${g.meta.id}/backup" data-nav="/g/${g.meta.id}/backup">Backup &amp; export<span class="side">${g.backups.length ? "Last saved " + esc(ago(g.backups[0].t)) : "Saved nightly"}</span></a>
-    <a href="/g/${g.meta.id}/settings" data-nav="/g/${g.meta.id}/settings">Group settings<span class="side">${g.isCreator ? "Name, passcode, delete" : "Name, members, leave"}</span></a>
+    <a href="/g/${g.meta.id}/settings" data-nav="/g/${g.meta.id}/settings">Group settings<span class="side">${g.isCreator ? "Name, payments, passcode" : "Name, members, leave"}</span></a>
   </section>`;
 }
 
@@ -559,22 +611,74 @@ function balanceCard(g){
       : `<p class="empty-note">Balances show up once there are expenses.</p>`}
   </section>`;
 }
-function settleCard(g){
-  const plan = settlePlan(balances(g)), cur = g.meta.currency;
+function undoRowHtml(g){
+  const cur = g.meta.currency;
   const u = S.ui.undo && S.ui.undo.g === g.meta.id && g.entries.some(e => e.id === S.ui.undo.id) ? S.ui.undo : null;
-  const undoRow = u ? `<div class="undo" role="status"><span class="ok">${ICON.check}</span>
+  return u ? `<div class="undo" role="status"><span class="ok">${ICON.check}</span>
       <div class="who"><b>${u.from === g.me ? "You" : esc(pName(g, u.from))}</b> paid <b>${esc(youOr(g, u.to))}</b> <span class="num">${fmt(u.c, cur)}</span><div class="tiny">Marked paid ${esc(ago(u.t))}</div></div>
       <button type="button" class="btn sm" data-act="undoSettle">${ICON.undo}Undo</button></div>` : "";
+}
+// One payment row with a button. Your own payments say "Mark paid"; money coming to you says "Got it".
+function payRow(g, s, sub){
+  const cur = g.meta.currency, pay = s.from === g.me, other = pay ? s.to : s.from;
+  return `<div class="srow${sub ? " hasSub" : ""}">${faces([pOf(g, other)])}
+    <div class="who">${pay ? `You pay <b>${esc(pName(g, s.to))}</b>` : `<b>${esc(pName(g, s.from))}</b> pays you`}${sub ? `<span class="tiny muted sub">${sub}</span>` : ""}</div>
+    <span class="amt${pay ? "" : " pos"}">${fmt(s.c, cur)}</span>
+    <button type="button" class="btn sm" data-act="settle" data-from="${esc(s.from)}" data-to="${esc(s.to)}" data-c="${s.c}">${pay ? "Mark paid" : "Got it"}</button></div>`;
+}
+function settleCard(g){
+  const mode = groupMode(g), plan = planOf(g, mode);
+  const mine = plan.filter(s => s.from === g.me).concat(plan.filter(s => s.to === g.me));
   return `<section class="card pad stack" style="gap:6px">
-    <div class="between"><h2>Settle up</h2><span class="eyebrow">Fewest payments</span></div>
+    <div class="between"><h2>Settle up</h2><span class="eyebrow">${MODE_NAME[mode]}</span></div>
     ${g.people.filter(isActive).length < 2 ? `<p class="empty-note">Invite someone to start splitting.</p>`
       : !plan.length ? `<div class="pos" style="font-weight:600">✓ Everyone is square</div>`
-      : `<div>${plan.map((s, i) => `<div class="srow">${faces([pOf(g, s.from), pOf(g, s.to)])}
-          <div class="who"><b>${esc(pName(g, s.from))}</b> pays <b>${esc(pName(g, s.to))}</b></div>
-          <span class="amt">${fmt(s.c, cur)}</span>
-          <button type="button" class="btn sm" data-act="settle" data-i="${i}">Mark paid</button></div>`).join("")}</div>`}
-    ${undoRow}
+      : `${mine.length ? `<div>${mine.map(s => payRow(g, s)).join("")}</div>` : `<div class="pos" style="font-weight:600">✓ You're all square here</div>`}
+        <button type="button" class="btn full seeall" data-nav="/g/${g.meta.id}/payments">See all ${plan.length} payment${plan.length === 1 ? "" : "s"}${ICON.chev}</button>`}
+    ${undoRowHtml(g)}
   </section>`;
+}
+function viewPayments(g){
+  const cur = g.meta.currency, def = groupMode(g);
+  const mode = S.ui.view || def, plan = planOf(g, mode);
+  const pays = plan.filter(s => s.from === g.me), gets = plan.filter(s => s.to === g.me);
+  const rest = plan.filter(s => s.from !== g.me && s.to !== g.me);
+  const sum = a => a.reduce((t, s) => t + s.c, 0), P = sum(pays), R = sum(gets);
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const subOf = s => {
+    if (mode !== "direct" || !s.n) return "";
+    const nm = s.from === g.me ? pName(g, s.to) : pName(g, s.from);
+    const base = s.from === g.me ? `your share of ${plural(s.n, "thing")} ${esc(nm)} paid for` : `their share of ${plural(s.n, "thing")} you paid for`;
+    return s.mixed ? `What's left of ${base}` : base[0].toUpperCase() + base.slice(1);
+  };
+  const help = mode === "direct" ? "Pay back whoever paid for you." : "Debts are combined so the group makes as few payments as possible. You may pay someone for a thing someone else bought.";
+  const both = P && R;
+  const net = (balances(g)[g.me] || { net: 0 }).net;
+  return `${groupBack(g)}
+  <h1>All payments</h1>
+  <div class="seg" role="group" aria-label="How payments are shown">
+    ${["direct", "fewest"].map(m => `<button type="button" data-act="flipView" data-m="${m}" aria-pressed="${m === mode}">${MODE_NAME[m]}</button>`).join("")}
+  </div>
+  <p class="small muted" style="margin-top:-4px;line-height:1.5">${help} ${mode === def ? `The group creator picks the default in <a href="/g/${g.meta.id}/settings" data-nav="/g/${g.meta.id}/settings">Group settings</a>.` : `This group normally shows ${MODE_NAME[def]}. Totals are the same either way.`}</p>
+  ${!plan.length ? `<section class="card pad"><div class="pos" style="font-weight:600">✓ Everyone is square</div></section>` : ""}
+  ${both ? `<div class="grid2 sumtiles"><div class="st neg"><span>You pay</span><b class="num">${fmt(P, cur)}</b></div><div class="st pos"><span>You get</span><b class="num">${fmt(R, cur)}</b></div></div>
+    <p class="small muted" style="margin-top:-6px;line-height:1.5">${Math.abs(net) < 1 ? "Overall you're even." : `Overall you ${net < 0 ? "owe" : "are owed"} <b class="num" style="color:var(--ink)">${fmt(Math.abs(net), cur)}</b>.`} Paying and getting these settles it.</p>` : ""}
+  ${pays.length ? `<section class="card pad stack" style="gap:6px">
+    <div class="between cardhead"><h2>You pay</h2><span class="small muted">${both ? plural(pays.length, "payment") : `Total <b class="num neg">${fmt(P, cur)}</b>`}</span></div>
+    <div>${pays.map(s => payRow(g, s, subOf(s))).join("")}</div>
+    <button type="button" class="linkbtn" data-act="myExpenses">See which expenses add up to this</button>
+  </section>` : ""}
+  ${gets.length ? `<section class="card pad stack" style="gap:6px">
+    <div class="between cardhead"><h2>You get</h2><span class="small muted">${both ? plural(gets.length, "payment") : `Total <b class="num pos">${fmt(R, cur)}</b>`}</span></div>
+    <div>${gets.map(s => payRow(g, s, subOf(s))).join("")}</div>
+    <span class="tiny muted" style="line-height:1.5">"Got it" records that they paid you, same as them tapping Mark paid.</span>
+  </section>` : ""}
+  ${undoRowHtml(g) ? `<section class="card pad">${undoRowHtml(g)}</section>` : ""}
+  ${rest.length ? `<section class="card pad stack" style="gap:2px">
+    <div class="between cardhead"><h2>${pays.length || gets.length ? "Everyone else" : "Payments"}</h2><span class="small muted">${plural(rest.length, "payment")}</span></div>
+    <div>${rest.map(s => `<div class="orow"><span><b>${esc(pName(g, s.from))}</b> pays <b>${esc(pName(g, s.to))}</b></span><b class="num">${fmt(s.c, cur)}</b></div>`).join("")}</div>
+  </section>` : ""}
+  <button type="button" class="btn lg full" data-nav="/g/${g.meta.id}/pay" ${g.people.filter(isActive).length < 2 ? "disabled" : ""}>Record a payment</button>`;
 }
 function entryRow(g, e, pf, emojis, last){
   const who = pf || g.me;
@@ -698,6 +802,7 @@ function actText(g, a){
     case "renamed": return a.from ? `changed their name from <b>${esc(a.from)}</b>` : `renamed someone to <b>${esc(a.name)}</b>`;
     case "renamed group": return `renamed the group to <b>${esc(a.name)}</b>`;
     case "currency": return `changed the money to <b>${esc(a.name)}</b>`;
+    case "settleMode": return `changed how to settle up to <b>${esc(MODE_NAME[a.name] || a.name)}</b>`;
     case "passcode": return "changed the group passcode";
     case "settings": return "changed the group settings";
     case "removed person": return `removed <b>${esc(a.name)}</b>`;
@@ -762,6 +867,12 @@ function viewSettings(g){
     <select id="scur" ${g.isCreator ? "" : "disabled"}>${CURRENCIES.map(([v, l]) => `<option value="${v}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
     ${g.isCreator ? "" : `<span class="hint">Only ${esc(creatorName)} can change this.</span>`}
   </div>
+  <section class="card pad stack" style="gap:10px" aria-labelledby="smH">
+    <div class="between" style="align-items:center"><h2 id="smH">How to settle up</h2>${g.isCreator ? "" : `<span class="badge">Creator only</span>`}</div>
+    ${[["direct", "Pay back whoever paid for you. Easier to follow, a few more payments."], ["fewest", "Combines debts so the group makes as few payments as possible. You may pay someone for a thing someone else bought."]].map(([m, d]) =>
+      `<label class="radio tall"><input type="radio" name="settleMode" value="${m}" ${groupMode(g) === m ? "checked" : ""} ${g.isCreator ? "" : "disabled"}><span class="stack" style="gap:3px"><b style="font-size:15px">${MODE_NAME[m]}</b><span class="tiny muted" style="line-height:1.45">${d}</span></span></label>`).join("")}
+    <span class="tiny muted" style="line-height:1.5">${g.isCreator ? "Only you can change this." : `Only ${esc(creatorName)} can change this.`} Everyone can still flip the view on the All payments screen; totals never change.</span>
+  </section>
   <section class="card pad stack" style="gap:10px">
     <h2>Invite</h2>
     <div class="mono-box"><span class="tiny muted">Private link</span><span class="num">${esc(inviteLink(g.meta.id))}</span></div>
@@ -1163,7 +1274,7 @@ const ACT = {
     const s = all[+el.dataset.i]; if (!s) return;
     go(`/g/${s.g.id}/pay`, { from: s.from, to: s.to, c: s.c, fresh: true });
   },
-  logout: async () => { try { await api("POST", "/api/auth", { op: "logout" }); } catch {} S.user = null; S.home = null; S.g = {}; go("/", {}); },
+  logout: async () => { try { await api("POST", "/api/auth", { op: "logout" }); } catch {} clearHomeCache(); S.user = null; S.home = null; S.g = {}; go("/", {}); },
   dlgUsername: () => openDialog(dlgShell("Change username", `<div class="field"><label class="eyebrow" for="du">New username</label><input id="du" name="username" type="text" autocapitalize="off" spellcheck="false" maxlength="20" value="${esc(S.user.username)}"><span class="hint">3 to 20 letters, numbers, dots or underscores. Groups will see the new name.</span></div>`, "Save"),
     async f => { const d = await api("POST", "/api/auth", { op: "changeUsername", username: f.username }); S.user = { ...S.user, ...d.user }; S.home = null; S.g = {}; DLG.close(); toast("Username changed"); render(); }),
   dlgPassword: () => openDialog(dlgShell("Change password", `<div class="field"><label class="eyebrow" for="dc">Current password</label><span class="pwwrap"><input id="dc" name="current" type="password" autocomplete="current-password"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span></div>
@@ -1173,7 +1284,7 @@ const ACT = {
     async f => { const d = await api("POST", "/api/auth", { op: "newRecovery", password: f.password }); DLG.close(); S.showCode = { code: d.recoveryCode }; render(); }),
   dlgDelete: () => openDialog(dlgShell("Delete your profile?", `<p class="small" style="color:var(--body2)">You'll leave every group. Your past expenses stay in them, shown as "former member". You need to be settled up everywhere first. If you're the only one left in a group you created, that group is deleted too. This can't be undone.</p>
     <div class="field"><label class="eyebrow" for="dd">Password</label><span class="pwwrap"><input id="dd" name="password" type="password" autocomplete="current-password"><button type="button" class="eye" data-act="peek" aria-label="Show" aria-pressed="false">${ICON.eye}</button></span></div>`, "Delete profile", true),
-    async f => { await api("POST", "/api/auth", { op: "deleteProfile", password: f.password }); DLG.close(); S.user = null; S.home = null; S.g = {}; toast("Profile deleted"); go("/", {}); }),
+    async f => { await api("POST", "/api/auth", { op: "deleteProfile", password: f.password }); DLG.close(); clearHomeCache(); S.user = null; S.home = null; S.g = {}; toast("Profile deleted"); go("/", {}); }),
   pick: el => { S.ui.claim = el.dataset.id; S.ui.pc = V.querySelector("#jp").value; render(); },
   invite: () => { const g = G(); copyText(`Join "${g.meta.name}" on Contri so we can split costs: ${inviteLink(g.meta.id)}\nI'll send you the passcode separately.`, "Invite copied"); },
   copyNewInvite: () => { const d = S.ui.created; copyText(`Join "${d.name}" on Contri so we can split costs: ${inviteLink(d.g)}\nPasscode: ${d.passcode}`, "Invite copied"); },
@@ -1193,7 +1304,8 @@ const ACT = {
       .catch(err => img.replaceWith(Object.assign(document.createElement("p"), { className: "small muted", textContent: err.message }))));
   },
   settle: async el => {
-    const g = G(); const s = settlePlan(balances(g))[+el.dataset.i]; if (!s) return;
+    const g = G(); const s = { from: el.dataset.from, to: el.dataset.to, c: Math.round(+el.dataset.c) };
+    if (!s.from || !s.to || !(s.c > 0)) return;
     el.disabled = true;
     const entry = { id: uid(), type: "payment", amount: s.c, date: today(), paidBy: s.from, split: { [s.to]: s.c }, note: "" };
     try {
@@ -1212,6 +1324,8 @@ const ACT = {
       const y = window.scrollY; render(); window.scrollTo(0, y);
     } catch (e){ el.disabled = false; handleErr(e); }
   },
+  flipView: el => { S.ui.view = el.dataset.m; const y = window.scrollY; render(); window.scrollTo(0, y); },
+  myExpenses: () => { const g = G(); history.pushState({}, "", `/g/${g.meta.id}/expenses`); S.ui = { pf: g.me }; window.scrollTo(0, 0); render(); },
   cf: el => { const c = el.dataset.c; S.ui.cf = (S.ui.cf || "").toLowerCase() === c.toLowerCase() ? "" : c; const g = G();
     V.querySelectorAll("[data-act=cf]").forEach(b => b.setAttribute("aria-pressed", (S.ui.cf || "").toLowerCase() === b.dataset.c.toLowerCase()));
     V.querySelector("#exList").innerHTML = ledgerHtml(g, { q: S.ui.q, pf: S.ui.pf, cf: S.ui.cf }); },
@@ -1285,9 +1399,16 @@ V.addEventListener("change", ev => {
   if (ev.target.id === "gEmoji"){ const e = firstEmoji(ev.target.value); ev.target.value = e || S.ui.emoji || (G() && G().meta && G().meta.emoji) || QUICK_EMOJI[0]; V.querySelector("#emoShow").textContent = ev.target.value; if (e) saveLook(); }
   if (ev.target.id === "rcOk"){ V.querySelector("#rcDone").disabled = !ev.target.checked; }
   if (ev.target.id === "scur") setCurrency(ev.target);
+  if (ev.target.name === "settleMode") setSettleMode(ev.target);
   if (ev.target.id === "sn") renameGroup(ev.target);
   if (ev.target.id === "au" && V.querySelector("#auHint")) V.querySelector("#auHint").className = "hint";
 });
+async function setSettleMode(inp){
+  const g = G();
+  try { await api("POST", "/api/group", { op: "setSettleMode", g: g.meta.id, mode: inp.value }); await loadGroup(g.meta.id); S.home = null; toast("Settle up updated"); }
+  catch (e){ handleErr(e); }
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+}
 async function setCurrency(sel){
   const g = G();
   try { await api("POST", "/api/group", { op: "setCurrency", g: g.meta.id, currency: sel.value }); await loadGroup(g.meta.id); toast("Money updated"); }
@@ -1319,7 +1440,7 @@ const FORMS = {
   async login(f, err){
     if (!f.username.trim() || !f.password){ err.textContent = "Enter your username and password."; return; }
     const d = await api("POST", "/api/auth", { op: "login", username: f.username.trim(), password: f.password });
-    S.user = d.user; S.home = null; S.ui = {}; render();
+    clearHomeCache(); S.user = d.user; S.home = null; S.ui = {}; render();
   },
   async reset(f, err){
     const d = await api("POST", "/api/auth", { op: "reset", username: f.username.trim(), code: f.code, password: f.password });
@@ -1404,9 +1525,8 @@ async function pollHome(r){
   polling = true;
   try {
     const d = await api("GET", "/api/home");
-    if (JSON.stringify(d) !== JSON.stringify(S.home) && !route().gid && !route().v && !DLG.open){
-      S.home = d; const y = window.scrollY; paint(S.home.groups.length ? viewHome() : viewEmptyHome(), "", true); window.scrollTo(0, y);
-    }
+    if (!d.user){ clearHomeCache(); S.user = null; S.home = null; return render(); }
+    if (JSON.stringify(d) !== JSON.stringify(S.home) && !route().gid && !route().v && !DLG.open){ saveHome(d); paintHome(true); }
   } catch {} finally { polling = false; }
 }
 setInterval(poll, POLL_MS);
@@ -1414,7 +1534,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible" || !S.user) return;
   const r = route();
   if (r.gid) poll();
-  else if (!r.v){ S.home = null; render(); }
+  else if (!r.v && S.home) refreshHome();
+  else if (!r.v) render();
 });
 
 let tt;
@@ -1425,4 +1546,5 @@ function toast(t){
 }
 
 render();
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 })();

@@ -219,7 +219,7 @@ export async function memberGate(db, gid, user, { allowStale = false } = {}) {
 }
 
 export function publicMeta(m) {
-  return { id: m.id, name: m.name, currency: m.currency, creator: m.creator, createdAt: m.createdAt, emoji: m.emoji || "", color: m.color || "" };
+  return { id: m.id, name: m.name, currency: m.currency, creator: m.creator, createdAt: m.createdAt, emoji: m.emoji || "", color: m.color || "", settleMode: m.settleMode === "fewest" ? "fewest" : "direct" };
 }
 
 // A group's or category's look: one emoji (any, from the keyboard) and a color from a fixed set.
@@ -312,6 +312,28 @@ export function settlePlan(b) {
   }
   return out;
 }
+
+// Who owes whom: pay back whoever paid for you. For each pair, what one owes the other
+// (their share of things the other paid for, plus payments the other made to them) is netted.
+// n = how many expenses paid by `to` that `from` had a share in; mixed = something offset it.
+export function directPlan(entries) {
+  const M = {}, N = {};
+  const bump = (o, a, b, v) => { o[a] = o[a] || {}; o[a][b] = (o[a][b] || 0) + v; };
+  for (const e of entries) for (const [id, c] of Object.entries(e.split || {})) {
+    if (id === e.paidBy || !c) continue;
+    bump(M, id, e.paidBy, c);
+    if (e.type !== "payment") bump(N, id, e.paidBy, 1);
+  }
+  const ids = new Set(); for (const a of Object.keys(M)) { ids.add(a); for (const b of Object.keys(M[a])) ids.add(b); }
+  const arr = [...ids].sort(), at = (o, a, b) => (o[a] && o[a][b]) || 0, out = [];
+  for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+    const a = arr[i], b = arr[j], d = at(M, a, b) - at(M, b, a);
+    if (d > 0) out.push({ from: a, to: b, c: d, n: at(N, a, b), mixed: at(M, b, a) > 0 });
+    else if (d < 0) out.push({ from: b, to: a, c: -d, n: at(N, b, a), mixed: at(M, a, b) > 0 });
+  }
+  return out.sort((x, z) => z.c - x.c || x.from.localeCompare(z.from) || x.to.localeCompare(z.to));
+}
+export const planFor = (mode, entries, bal) => mode === "fewest" ? settlePlan(bal || balances(entries)) : directPlan(entries);
 
 /* ---------- backups ---------- */
 export async function snapshot(db, gid) {

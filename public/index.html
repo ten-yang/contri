@@ -238,6 +238,16 @@ dialog h2{font-size:22px}
 /* settle up with faces + undo */
 .srow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line2)}
 .srow:last-child{border-bottom:0}
+.srow .who .sub{display:block;margin-top:2px;line-height:1.4}
+.seeall{justify-content:center;gap:6px;margin-top:6px;border:2px solid var(--accent);color:var(--accent);font-weight:600}
+.cardhead{align-items:baseline;border-bottom:2px dashed var(--line);padding-bottom:10px}
+.sumtiles .st{border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.sumtiles .st span{font-size:12px;font-weight:600}.sumtiles .st b{font-size:18px}
+.sumtiles .st.neg{background:var(--neg-soft)}.sumtiles .st.pos{background:var(--pos-soft)}
+.orow{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:40px;border-bottom:1px solid var(--line2);font-size:14px}
+.orow:last-child{border-bottom:0}
+.radio.tall{align-items:flex-start;padding:12px 14px}.radio.tall input{margin-top:2px;flex:none}
+.radio:has(input:disabled){cursor:default}
 .srow .who{flex:1;min-width:0;font-size:14px;overflow-wrap:anywhere}
 .srow .amt{font-family:var(--mono);font-weight:600;font-size:14px;white-space:nowrap}
 .undo{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--pos-soft);color:#1f4d30;margin-top:4px}
@@ -353,6 +363,6 @@ dialog h2{font-size:22px}
 <div class="wave" id="wave" aria-hidden="true" hidden><svg viewBox="0 0 390 200" preserveAspectRatio="none"><path d="M0 92 C 70 40, 150 140, 245 86 S 360 52, 390 64 V200 H0Z" fill="#8a9a78" opacity=".16"/><path d="M0 132 C 90 96, 180 170, 280 124 S 370 108, 390 116 V200 H0Z" fill="#8a9a78" opacity=".14"/></svg></div>
 <main id="view"><div class="loading">Loading…</div></main>
 <dialog id="dlg"></dialog>
-<script src="/app.js?v=12"></script>
+<script src="/app.js?v=13"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // GET  /api/group?g=ID[&v=N] -> the group (or an invite preview if you're not in it yet)
 // POST /api/group {op, g, ...} -> create, join, verify, putEntry, delEntry, restoreEntry,
-//                                  rename, setCurrency, changePasscode, leave, deleteGroup
+//                                  rename, setCurrency, setSettleMode, changePasscode, leave, deleteGroup
 import {
   handle, body, ipOf, K, Bad, need, rid, newGid, GID, LEGACY_GID, CURRENCIES, PHOTO_DAYS,
   hashSecret, secretOk, legacyPasscodeOk, requireUser, checkLock, addFail, memberGate, loadMeta, saveMeta,
@@ -268,6 +268,14 @@ async function write(db, user, b, ip) {
       if (c === meta.currency) return { ok: true };
       meta.currency = c; await saveMeta(db, meta);
       log = { action: "currency", name: c };
+      break;
+    }
+    case "setSettleMode": {
+      need(isCreator, "Only the person who created the group can change this.", 403);
+      const m = b.mode === "fewest" ? "fewest" : "direct";
+      if (m === (meta.settleMode === "fewest" ? "fewest" : "direct")) return { ok: true };
+      meta.settleMode = m; await saveMeta(db, meta);
+      log = { action: "settleMode", name: m };
       break;
     }
     case "changePasscode": {
